@@ -1,0 +1,43 @@
+name: Supabase keep-alive ping
+
+# Free Supabase projects auto-pause after 7 consecutive days of inactivity.
+# This workflow runs on a schedule and calls the `ping` RPC, registering
+# database activity so the project stays awake between weekly game days.
+#
+# SETUP (one-time):
+#   1. In your repo settings → Secrets and variables → Actions, add:
+#        SUPABASE_URL       (e.g. https://abcde.supabase.co)
+#        SUPABASE_ANON_KEY  (the anon/public key from Project Settings → API)
+#   2. Push this file to GitHub. The schedule below runs every 3 days at 09:00 UTC.
+#      You can adjust the cron expression to whatever cadence suits your league.
+#   3. You can also trigger it manually via Actions → "Supabase keep-alive ping" → Run workflow.
+
+on:
+  schedule:
+    - cron: '0 9 */3 * *'  # every 3 days at 09:00 UTC
+  workflow_dispatch:        # allows manual trigger from the Actions tab
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call ping RPC
+        run: |
+          set -euo pipefail
+          if [ -z "${{ secrets.SUPABASE_URL }}" ] || [ -z "${{ secrets.SUPABASE_ANON_KEY }}" ]; then
+            echo "::error::Set SUPABASE_URL and SUPABASE_ANON_KEY repo secrets first."
+            exit 1
+          fi
+          response=$(curl -sS -w "\n%{http_code}" -X POST \
+            "${{ secrets.SUPABASE_URL }}/rest/v1/rpc/ping" \
+            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Authorization: Bearer ${{ secrets.SUPABASE_ANON_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{}')
+          body=$(echo "$response" | head -n 1)
+          code=$(echo "$response" | tail -n 1)
+          echo "HTTP $code — body: $body"
+          if [ "$code" != "200" ]; then
+            echo "::error::ping RPC failed with status $code"
+            exit 1
+          fi

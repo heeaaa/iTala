@@ -1,0 +1,12 @@
+# iTala — Supabase configuration (optional)
+#
+# Copy this file to `.env` and fill in values from your Supabase project
+# (Dashboard → Project Settings → API). With both values set, the app runs in
+# SYNCED mode. With either missing, it runs in LOCAL-ONLY mode (single device).
+#
+# EXPO_PUBLIC_* vars are inlined into the JS bundle by Metro, so they're safe
+# to put here for local development. The ANON key is safe to ship in the client
+# binary — row-level security on the database is what actually protects writes.
+
+EXPO_PUBLIC_SUPABASE_URL=https://dsoogiyfgsagbetlumnc.supabase.co
+EXPO_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImRzb29naXlmZ3NhZ2JldGx1bW5jIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODA1MDMzNTUsImV4cCI6MjA5NjA3OTM1NX0.gzvmkCK0qp41IW2pEUh2C3dNubelUMxJMnVPrx4A7Cs
