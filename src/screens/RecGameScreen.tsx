@@ -7,7 +7,7 @@ import { colors, space, radius, font, teamColors } from '../theme';
 import { uid } from '../lib/format';
 import { ScreenProps } from '../navigation';
 
-const REC_LEAGUE_NAME = 'Recreational / Drop-In Games';
+const PRIVATE_REC_NAME = 'Private Drop-In Games';
 
 // Find the existing recreational league, if any.
 export function findRecLeagueId(leagues: { id: string; kind?: string }[]): string | undefined {
@@ -59,35 +59,37 @@ export default function RecGameScreen({ navigation }: ScreenProps<'RecGame'>) {
   const start = () => {
     if (!ready) return;
 
-    // Resolve the target container. Public games go to the single shared
-    // community space; private games go to this user's personal drop-in
-    // space (any rec league they already own counts, covering legacy data).
-    let recId: string | undefined;
+    // Resolve the target container. Public → the single shared community space;
+    // private → this user's personal space. We DON'T dispatch ADD_LEAGUE
+    // separately anymore — that raced the game insert (the league didn't exist
+    // server-side yet, so teams/games failed their foreign key and the game
+    // "disappeared" on the next pull). Instead REC_SETUP_GAME carries
+    // ensureLeague and the sync layer creates the league first, atomically.
+    let recId: string;
+    let ensureLeague: { name: string; isShared?: boolean } | undefined;
     if (makePublic) {
-      recId = state.leagues.find(l => l.kind === 'recreational' && l.isShared)?.id;
-      if (!recId) {
-        recId = 'rec-shared';
-        dispatch({ t: 'ADD_LEAGUE', id: recId, name: 'Community Drop-In', season: 'Drop-In', kind: 'recreational', isShared: true });
-      }
+      const existing = state.leagues.find(l => l.kind === 'recreational' && l.isShared);
+      recId = existing?.id ?? 'rec-shared';
+      if (!existing) ensureLeague = { name: 'Community Drop-In', isShared: true };
     } else {
-      recId = state.leagues.find(l => l.kind === 'recreational' && !l.isShared && isOwner(l))?.id;
-      if (!recId) {
-        recId = `rec-${userId ?? 'local'}`;
-        dispatch({ t: 'ADD_LEAGUE', id: recId, name: REC_LEAGUE_NAME, season: 'Drop-In', kind: 'recreational' });
-      }
+      const existing = state.leagues.find(l => l.kind === 'recreational' && !l.isShared && isOwner(l));
+      recId = existing?.id ?? `rec-${userId ?? 'local'}`;
+      if (!existing) ensureLeague = { name: PRIVATE_REC_NAME };
     }
 
-    // Atomically create the two teams (+players) and the live game in one action,
-    // so we can navigate straight to lineup selection with a known gameId.
+    // Explicit ids assigned HERE so the sync layer pushes exactly these
+    // entities — no "guess the last two teams" (which broke because pulls sort
+    // teams alphabetically, losing the just-added players).
     const gameId = uid();
     dispatch({
       t: 'REC_SETUP_GAME',
       leagueId: recId,
       gameId,
       location: location.trim() || undefined,
+      ensureLeague,
       teams: [
-        { name: teams[0].name.trim(), players: teams[0].players.map(p => ({ name: p.name, number: p.num || undefined })) },
-        { name: teams[1].name.trim(), players: teams[1].players.map(p => ({ name: p.name, number: p.num || undefined })) },
+        { id: uid(), name: teams[0].name.trim(), players: teams[0].players.map(p => ({ id: p.id, name: p.name, number: p.num || undefined })) },
+        { id: uid(), name: teams[1].name.trim(), players: teams[1].players.map(p => ({ id: p.id, name: p.name, number: p.num || undefined })) },
       ],
     });
 

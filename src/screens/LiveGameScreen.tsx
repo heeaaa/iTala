@@ -617,13 +617,25 @@ function SpectatorPanel({ league, game, activeTeam, onCourtIds }: {
   const topReb = (box: { lines: typeof homeBox.lines }) =>
     [...box.lines].filter(l => l.playerId).sort((a, b) => b.reb - a.reb)[0];
 
-  // MVP so far: best composite line across both teams
-  const mvp = (() => {
-    const all = [...homeBox.lines.map(l => ({ l, team: home })), ...awayBox.lines.map(l => ({ l, team: away }))]
-      .filter(x => x.l.playerId);
-    if (all.length === 0) return null;
-    const best = all.sort((a, b) => perfRating(b.l) - perfRating(a.l))[0];
-    return perfRating(best.l) > 0 ? best : null;
+  // Player of the Game so far: best composite line, drawn from the CURRENTLY
+  // WINNING team (basketball convention — the POTG comes from the winning
+  // side). If the score is tied, consider both teams. Falls back to overall
+  // best if the leading team has no positive contributor yet.
+  const potg = (() => {
+    const homePts = homeBox.total.pts;
+    const awayPts = awayBox.total.pts;
+    const homeCand = homeBox.lines.map(l => ({ l, team: home }));
+    const awayCand = awayBox.lines.map(l => ({ l, team: away }));
+    let pool = homePts === awayPts
+      ? [...homeCand, ...awayCand]
+      : (homePts > awayPts ? homeCand : awayCand);
+    pool = pool.filter(x => x.l.playerId && perfRating(x.l) > 0);
+    if (pool.length === 0) {
+      // leading team hasn't recorded a positive line — fall back to all players
+      pool = [...homeCand, ...awayCand].filter(x => x.l.playerId && perfRating(x.l) > 0);
+    }
+    if (pool.length === 0) return null;
+    return pool.sort((a, b) => perfRating(b.l) - perfRating(a.l))[0];
   })();
 
   const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
@@ -641,12 +653,12 @@ function SpectatorPanel({ league, game, activeTeam, onCourtIds }: {
 
   return (
     <ScrollView style={{ flex: 1, marginTop: space(2) }} contentContainerStyle={{ paddingBottom: space(4) }} showsVerticalScrollIndicator={false}>
-      {mvp && mvp.team && (
+      {potg && potg.team && (
         <View style={{ borderRadius: radius.md, borderWidth: 1, borderColor: colors.brandTeal, backgroundColor: colors.accentDim, padding: 12 }}>
-          <Txt k="label" color={colors.brandTeal} style={{ marginBottom: 4 }}>🏅 MVP so far</Txt>
-          <Txt k="h2">{nameOf(mvp.l.playerId)} <Txt k="body" color={colors.muted}>· {mvp.team.name}</Txt></Txt>
+          <Txt k="label" color={colors.brandTeal} style={{ marginBottom: 4 }}>🏅 Player of the Game so far</Txt>
+          <Txt k="h2">{nameOf(potg.l.playerId)} <Txt k="body" color={colors.muted}>· {potg.team.name}</Txt></Txt>
           <Txt k="body" color={colors.muted} style={{ fontSize: 13 }}>
-            {mvp.l.pts} PTS · {mvp.l.reb} REB · {mvp.l.ast} AST{mvp.l.stl ? ` · ${mvp.l.stl} STL` : ''}{mvp.l.blk ? ` · ${mvp.l.blk} BLK` : ''}
+            {potg.l.pts} PTS · {potg.l.reb} REB · {potg.l.ast} AST{potg.l.stl ? ` · ${potg.l.stl} STL` : ''}{potg.l.blk ? ` · ${potg.l.blk} BLK` : ''}
           </Txt>
         </View>
       )}

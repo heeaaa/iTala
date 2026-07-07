@@ -297,25 +297,41 @@ export async function pushAction(sb: SupabaseClient, action: Action, state: AppS
       case 'REC_SETUP_GAME': {
         const l = state.leagues.find(x => x.id === action.leagueId);
         if (!l) return;
-        // The reducer created two teams + their players + a game atomically. Push all of it.
-        const newTeamIds = [l.teams[l.teams.length - 2]?.id, l.teams[l.teams.length - 1]?.id].filter(Boolean) as string[];
-        for (const tid of newTeamIds) {
-          const t = l.teams.find(x => x.id === tid)!;
-          check('UPSERT_teams', await sb.from('teams').upsert({
-            id: t.id, league_id: l.id, name: t.name, color: t.color,
-            logo: t.logo ?? null, team_only: !!t.teamOnly, player_ids: t.playerIds,
+        // FK-SAFE ORDER, and no guessing which teams are new — the action
+        // carries their exact ids. (1) Ensure the league row exists on the
+        // server BEFORE anything references it; the RPC is idempotent and
+        // records ownership. Without this the teams/game hit a foreign-key
+        // error and the game vanished on the next pull → "Game not found".
+        if (action.ensureLeague) {
+          check('REC_create_league', await sb.rpc('create_league', {
+            p_id: l.id, p_name: action.ensureLeague.name, p_season: 'Drop-In',
+            p_kind: 'recreational', p_foul_out: null,
+            p_track_misses: true, p_track_turnovers: true,
+            p_created_at: l.createdAt,
+            p_code: null, p_shared: action.ensureLeague.isShared ?? false,
           }));
         }
-        // The new players are everyone newly attached to those two teams.
-        const newPlayerIds = newTeamIds.flatMap(tid => l.teams.find(t => t.id === tid)!.playerIds);
-        for (const pid of newPlayerIds) {
-          const p = l.players.find(x => x.id === pid)!;
-          check('UPSERT_players', await sb.from('players').upsert({
-            id: p.id, league_id: l.id, name: p.name, number: p.number ?? null,
+        // (2) Teams, then (3) players, then (4) the game — each references the
+        // previous. IDs come straight from the action, so exactly the right
+        // rows are written regardless of local array ordering.
+        const teamIds = action.teams.map(t => t.id);
+        for (const tid of teamIds) {
+          const t = l.teams.find(x => x.id === tid);
+          if (!t) continue;
+          check('REC_teams', await sb.from('teams').upsert({
+            id: t.id, league_id: l.id, name: t.name, color: t.color,
+            logo: t.logo ?? null, coach: t.coach ?? null, team_only: !!t.teamOnly, player_ids: t.playerIds,
           }));
+        }
+        for (const td of action.teams) {
+          for (const pd of td.players) {
+            check('REC_players', await sb.from('players').upsert({
+              id: pd.id, league_id: l.id, name: pd.name, number: pd.number ?? null,
+            }));
+          }
         }
         const g = l.games.find(x => x.id === action.gameId);
-        if (g) check('UPSERT_games', await sb.from('games').upsert(gameToRow(g)));
+        if (g) check('REC_games', await sb.from('games').upsert(gameToRow(g)));
         break;
       }
 

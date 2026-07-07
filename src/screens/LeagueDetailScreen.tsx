@@ -77,7 +77,7 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
         )}
       </View>
 
-      <ScrollView contentContainerStyle={{ padding: space(4), paddingBottom: space(28) }}>
+      <ScrollView contentContainerStyle={{ padding: space(4), paddingBottom: scorer ? space(24) : space(10) }}>
         {/* Settings live INSIDE the scroll view so long content (codes, members,
             duplicate, archive) is always reachable. */}
         {owner && showSettings && (
@@ -121,6 +121,35 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
                       [
                         { text: 'Cancel', style: 'cancel' },
                         { text: 'Archive', style: 'destructive', onPress: () => dispatch({ t: 'SET_LEAGUE_SETTINGS', leagueId, isArchived: true }) },
+                      ],
+                    );
+                  }}
+                />
+                <Button
+                  title="🗑 Delete league permanently"
+                  kind="danger"
+                  style={{ marginTop: space(2) }}
+                  onPress={() => {
+                    // Two-step confirm — deletion cascades to teams, players,
+                    // games, and events and cannot be undone.
+                    Alert.alert(
+                      'Delete this league?',
+                      `This permanently deletes "${league.name}" and ALL its teams, players, games, and stats. This cannot be undone. Consider Archiving instead if you only want to hide it.`,
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Delete', style: 'destructive', onPress: () => {
+                          Alert.alert(
+                            'Are you absolutely sure?',
+                            `Last chance — "${league.name}" and everything in it will be gone for good.`,
+                            [
+                              { text: 'Keep league', style: 'cancel' },
+                              { text: 'Delete forever', style: 'destructive', onPress: () => {
+                                navigation.goBack();
+                                dispatch({ t: 'DELETE_LEAGUE', leagueId });
+                              } },
+                            ],
+                          );
+                        } },
                       ],
                     );
                   }}
@@ -428,8 +457,12 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
         )}
       </ScrollView>
 
-      {scorer && (
-        <View style={{ position: 'absolute', left: space(4), right: space(4), bottom: space(6) }}>
+      {scorer && !showSettings && (
+        <View style={{
+          position: 'absolute', left: 0, right: 0, bottom: 0,
+          paddingHorizontal: space(4), paddingTop: space(3), paddingBottom: space(6),
+          backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.line,
+        }}>
           <Button title="▶  Start Game" onPress={() => navigation.navigate('NewGame', { leagueId })}
             disabled={league.teams.length < 2} />
         </View>

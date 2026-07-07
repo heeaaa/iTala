@@ -54,10 +54,15 @@ export default function LeaguesScreen({ navigation }: ScreenProps<'Leagues'>) {
 
   // Live banner: EVERY live game across all visible leagues (a Saturday can
   // have several leagues playing at once).
-  const liveRefs = visibleLeagues.flatMap(l =>
-    l.games.filter(g => g.status === 'live')
-      .map(g => ({ leagueId: l.id, gameId: g.id, leagueName: l.name, league: l }))
-  );
+  // Favourite leagues' live games come first, then the rest — a fan's own
+  // league surfaces at the front of the carousel.
+  const favSet = new Set(prefs.favLeagueIds);
+  const liveRefs = [...visibleLeagues]
+    .sort((a, b) => (favSet.has(b.id) ? 1 : 0) - (favSet.has(a.id) ? 1 : 0))
+    .flatMap(l =>
+      l.games.filter(g => g.status === 'live')
+        .map(g => ({ leagueId: l.id, gameId: g.id, leagueName: l.name, league: l }))
+    );
 
   // Search + favorites. Favorites float to the top (stable within groups so
   // the newest-first creation order is otherwise preserved).
@@ -226,7 +231,7 @@ Share this with the organizer. It can create exactly one league, then expires.`)
       <FlatList
         data={leagueList}
         keyExtractor={l => l.id}
-        contentContainerStyle={{ paddingHorizontal: space(4), paddingBottom: space(40) }}
+        contentContainerStyle={{ paddingHorizontal: space(4), paddingBottom: role === 'guest' ? space(10) : (isAdmin ? space(52) : space(36)) }}
         refreshControl={synced ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brandTeal} colors={[colors.brandTeal]} /> : undefined}
         ListHeaderComponent={(() => {
           if (q) return null; // rec drop-in cards aren't part of search results
@@ -307,7 +312,11 @@ Share this with the organizer. It can create exactly one league, then expires.`)
       />
 
       {role !== 'guest' && (
-        <View style={{ position: 'absolute', left: space(4), right: space(4), bottom: space(6), gap: 10 }}>
+        <View style={{
+          position: 'absolute', left: 0, right: 0, bottom: 0,
+          paddingHorizontal: space(4), paddingTop: space(3), paddingBottom: space(6), gap: 10,
+          backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.line,
+        }}>
           {isAdmin && (
             <Button title="🎟  Create league-creation code" kind="ghost" onPress={() => { void onMintCode(); }} />
           )}

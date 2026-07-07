@@ -6,6 +6,8 @@ import { loadState, saveState, loadPrefs, savePrefs } from './storage';
 import { getSupabase, SYNC_ENABLED } from '../sync/supabase';
 import { fetchAllState, pushAction, subscribeRealtime } from '../sync/sync';
 
+interface RecTeamInput { id: string; name: string; color?: string; players: { id: string; name: string; number?: string }[] }
+
 export type Action =
   | { t: 'HYDRATE'; state: AppState }
   | { t: 'ADD_LEAGUE'; id: string; name: string; season: string; foulOutLimit?: number; kind?: 'league' | 'recreational'; trackMisses?: boolean; trackTurnovers?: boolean; isShared?: boolean; creationCode?: string }
@@ -30,7 +32,7 @@ export type Action =
   | { t: 'DUPLICATE_LEAGUE'; sourceLeagueId: string; newLeagueId: string; name: string; season: string }
   | { t: 'SET_LEAGUE_SETTINGS'; leagueId: string; trackMisses?: boolean; trackTurnovers?: boolean; isClosed?: boolean; isArchived?: boolean }
   | { t: 'SET_SETTINGS'; settings: Partial<AppState['settings']> }
-  | { t: 'REC_SETUP_GAME'; leagueId: string; gameId: string; location?: string; teams: [{ name: string; players: { name: string; number?: string }[] }, { name: string; players: { name: string; number?: string }[] }] };
+  | { t: 'REC_SETUP_GAME'; leagueId: string; gameId: string; location?: string; ensureLeague?: { name: string; isShared?: boolean }; teams: [RecTeamInput, RecTeamInput] }
 
 const defaultSettings = { trackMisses: true };
 const initial: AppState = { leagues: [], settings: { ...defaultSettings } };
@@ -311,37 +313,52 @@ function reducer(state: AppState, a: Action): AppState {
     case 'SET_SETTINGS':
       return { ...state, settings: { ...state.settings, ...a.settings } };
 
-    case 'REC_SETUP_GAME':
-      return mapLeague(state, a.leagueId, l => {
-        const newTeams: Team[] = [];
-        const newPlayers: Player[] = [];
-        a.teams.forEach((td, i) => {
-          const playerIds: string[] = [];
-          td.players.forEach(pd => {
-            const p: Player = { id: uid(), name: pd.name.trim() || 'Player', number: pd.number };
-            newPlayers.push(p);
-            playerIds.push(p.id);
-          });
-          newTeams.push({
-            id: uid(),
-            name: td.name.trim() || `Team ${i + 1}`,
-            color: teamColors[(l.teams.length + i) % teamColors.length],
-            playerIds,
-          });
-        });
-        const game: Game = {
-          id: a.gameId, leagueId: a.leagueId,
-          homeTeamId: newTeams[0].id, awayTeamId: newTeams[1].id,
-          status: 'live', scheduledAt: Date.now(), location: a.location,
-          homeOnCourt: [], awayOnCourt: [], period: 1,
+    case 'REC_SETUP_GAME': {
+      // Ensure the rec league exists locally first (create if needed).
+      let leagues = state.leagues;
+      if (!leagues.some(l => l.id === a.leagueId) && a.ensureLeague) {
+        const newLeague: League = {
+          id: a.leagueId, name: a.ensureLeague.name, season: 'Drop-In',
+          kind: 'recreational', isShared: a.ensureLeague.isShared || undefined,
+          createdAt: Date.now(), teams: [], players: [], games: [], events: [],
         };
-        return {
-          ...l,
-          teams: [...l.teams, ...newTeams],
-          players: [...l.players, ...newPlayers],
-          games: [game, ...l.games],
-        };
-      });
+        leagues = [newLeague, ...leagues];
+      }
+      return {
+        ...state,
+        leagues: leagues.map(l => {
+          if (l.id !== a.leagueId) return l;
+          const newTeams: Team[] = [];
+          const newPlayers: Player[] = [];
+          a.teams.forEach((td, i) => {
+            const playerIds: string[] = [];
+            td.players.forEach(pd => {
+              const p: Player = { id: pd.id, name: pd.name.trim() || 'Player', number: pd.number };
+              newPlayers.push(p);
+              playerIds.push(p.id);
+            });
+            newTeams.push({
+              id: td.id,
+              name: td.name.trim() || `Team ${i + 1}`,
+              color: td.color ?? teamColors[(l.teams.length + i) % teamColors.length],
+              playerIds,
+            });
+          });
+          const game: Game = {
+            id: a.gameId, leagueId: a.leagueId,
+            homeTeamId: newTeams[0].id, awayTeamId: newTeams[1].id,
+            status: 'live', scheduledAt: Date.now(), location: a.location,
+            homeOnCourt: [], awayOnCourt: [], period: 1,
+          };
+          return {
+            ...l,
+            teams: [...l.teams, ...newTeams],
+            players: [...l.players, ...newPlayers],
+            games: [game, ...l.games],
+          };
+        }),
+      };
+    }
 
     default:
       return state;
@@ -389,30 +406,54 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (SYNC_ENABLED) {
         const sb = getSupabase();
         if (sb) {
-          // Block until we have a session. Anonymous sign-in is kicked off by
-          // AdminProvider; here we just wait for the result. Up to ~5s.
+          // Wait for a session (anonymous sign-in is kicked off by
+          // AdminProvider). Longer window than before — a cold first launch on
+          // a tablet or a weak connection can take several seconds to mint the
+          // anonymous token, and RLS reads return empty without one.
           let session = (await sb.auth.getSession()).data.session;
           let waited = 0;
-          while (!session && waited < 5000) {
+          while (!session && waited < 8000) {
             await new Promise(r => setTimeout(r, 200));
             session = (await sb.auth.getSession()).data.session;
             waited += 200;
           }
-          if (!session) {
-            console.warn('Supabase: no auth session after 5s — initial pull will be skipped. Check Anonymous sign-in is enabled in your project.');
-          } else {
+
+          // Pull the authoritative server state. CRUCIAL: if this first attempt
+          // yields nothing (no session yet, or a slow/failed network call), we
+          // DON'T give up — we retry quietly in the background with backoff, so
+          // a slow-starting guest session recovers on its own without needing
+          // the user to sign in or relaunch. This is the iPad "empty on first
+          // open, appeared after sign-in" fix: the sign-in wasn't required,
+          // the retry would have filled it in regardless.
+          const tryPull = async (): Promise<boolean> => {
             try {
               const remote = await fetchAllState(sb);
-              if (!cancelled && remote && remote.leagues) {
-                const merged: AppState = {
+              if (!cancelled && remote && remote.leagues && remote.leagues.length > 0) {
+                baseDispatch({ t: 'HYDRATE', state: {
                   leagues: remote.leagues,
-                  settings: remote.settings ?? (saved?.settings ?? { trackMisses: true }),
-                };
-                baseDispatch({ t: 'HYDRATE', state: merged });
+                  settings: remote.settings ?? stateRef.current.settings,
+                } });
+                return true;
               }
             } catch (e) {
-              console.warn('initial Supabase pull failed:', (e as Error).message);
+              console.warn('Supabase pull attempt failed:', (e as Error).message);
             }
+            return false;
+          };
+
+          const gotData = await tryPull();
+          if (!gotData && !cancelled) {
+            // Background retry: 1s, 2s, 4s, 8s, then every 15s up to ~1 min.
+            // Stops as soon as a pull succeeds or the screen unmounts.
+            (async () => {
+              const delays = [1000, 2000, 4000, 8000, 15000, 15000, 15000];
+              for (const d of delays) {
+                if (cancelled) return;
+                await new Promise(r => setTimeout(r, d));
+                if (cancelled) return;
+                if (await tryPull()) return;
+              }
+            })();
           }
 
           // If auth state changes later (e.g. the very first sign-in completes

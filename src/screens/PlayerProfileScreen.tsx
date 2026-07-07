@@ -268,25 +268,49 @@ export default function PlayerProfileScreen({ route }: ScreenProps<'PlayerProfil
               <MiniStat label="3PM/G" value={c.tpmpg.toFixed(1)} />
             </View>
 
-            {/* CAREER HIGH */}
+            {/* CAREER HIGHS — matches the in-app section: individual single-game
+                bests, plus the best all-around game with matchup + score. */}
             <View style={{ marginHorizontal: 36, marginTop: 20, padding: 14, backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1, borderColor: colors.line }}>
-              <Txt k="label" color={colors.brandLime} style={{ fontSize: 10, letterSpacing: 1 }}>★ CAREER HIGH</Txt>
-              <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, marginTop: 4 }}>
-                <Txt color={colors.text} style={{ fontFamily: font.display, fontSize: 36, lineHeight: 46, includeFontPadding: false } as any}>{c.highPts}</Txt>
-                <Txt k="label" color={colors.muted}>PTS</Txt>
-              </View>
-              <Txt k="body" color={colors.muted} style={{ fontSize: 12, marginTop: 2 }}>
-                {c.bestGame ? `Best night: ${([
-                  ['pts', c.bestGame.pts],
-                  ['ast', c.bestGame.ast],
-                  ['reb', c.bestGame.reb],
-                  ['stl', c.bestGame.stl],
-                  ['blk', c.bestGame.blk],
+              <Txt k="label" color={colors.brandLime} style={{ fontSize: 10, letterSpacing: 1 }}>★ CAREER HIGHS</Txt>
+              <Txt k="body" color={colors.muted} style={{ fontSize: 9, marginTop: 1 }}>Single-game bests · each may be a different game</Txt>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14, marginTop: 8 }}>
+                {([
+                  ['PTS', c.highPts],
+                  ['REB', c.highReb],
+                  ['AST', c.highAst],
+                  ['STL', c.highStl],
+                  ['BLK', c.highBlk],
                 ] as [string, number][])
                   .filter(([, v]) => v > 0)
-                  .map(([label, v]) => `${v} ${label}`)
-                  .join(' / ')}` : ''}
-              </Txt>
+                  .map(([label, v]) => (
+                    <View key={label} style={{ alignItems: 'center' }}>
+                      <Txt color={colors.text} style={{ fontFamily: font.display, fontSize: 26, lineHeight: 32, includeFontPadding: false } as any}>{v}</Txt>
+                      <Txt k="label" color={colors.muted} style={{ fontSize: 9 }}>{label}</Txt>
+                    </View>
+                  ))}
+              </View>
+              {c.bestGame ? (
+                <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: colors.line, paddingTop: 10 }}>
+                  <Txt k="label" color={colors.brandTeal} style={{ fontSize: 9, letterSpacing: 1 }}>BEST ALL-AROUND GAME</Txt>
+                  <Txt k="body" color={colors.text} style={{ fontSize: 13, marginTop: 3 }}>
+                    {([
+                      ['PTS', c.bestGame.pts],
+                      ['REB', c.bestGame.reb],
+                      ['AST', c.bestGame.ast],
+                      ['STL', c.bestGame.stl],
+                      ['BLK', c.bestGame.blk],
+                    ] as [string, number][])
+                      .filter(([, v]) => v > 0)
+                      .map(([label, v]) => `${v} ${label}`)
+                      .join(' · ')}
+                  </Txt>
+                  {c.bestGame.matchup ? (
+                    <Txt k="body" color={colors.muted} style={{ fontSize: 11, marginTop: 2 }}>
+                      {c.bestGame.matchup} · {c.bestGame.score}
+                    </Txt>
+                  ) : null}
+                </View>
+              ) : null}
             </View>
 
             {/* LAST GAME */}
