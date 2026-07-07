@@ -125,6 +125,8 @@ export default function LiveGameScreen({ route, navigation }: ScreenProps<'LiveG
   const arm = (type: EventType | null) => { setFlash(null); setArmed(type); };
 
   const undo = () => { dispatch({ t: 'UNDO_EVENT', leagueId, gameId }); setFlash(null); };
+  const redo = () => { dispatch({ t: 'REDO_EVENT', leagueId, gameId }); setFlash(null); };
+  const canRedo = (league?._redo?.[gameId]?.length ?? 0) > 0;
 
   const nextPeriod = () => {
     if (period >= MAX_PERIOD) return;
@@ -208,6 +210,7 @@ export default function LiveGameScreen({ route, navigation }: ScreenProps<'LiveG
           <MiniBtn label={readOnly ? "📋 Play-by-play" : "📋 Log"} onPress={() => setLogOpen(true)} />
           {!readOnly && <MiniBtn label="⏱ Timeout" onPress={() => setTimeoutOpen(true)} />}
           {!readOnly && <MiniBtn label="↺ Undo" onPress={undo} disabled={!lastEvent} />}
+          {!readOnly && <MiniBtn label="↻ Redo" onPress={redo} disabled={!canRedo} />}
           {!readOnly && !activeTeam.teamOnly && <MiniBtn label="🔁 Subs" onPress={() => setSubOpen(true)} />}
         </View>
 

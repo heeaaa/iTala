@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { View, FlatList, Pressable, Alert, TextInput, ScrollView, Dimensions } from 'react-native';
+import { View, FlatList, Pressable, Alert, TextInput, ScrollView, Dimensions, RefreshControl } from 'react-native';
 
 const SCREEN_W = Dimensions.get('window').width;
 import {
@@ -17,7 +17,9 @@ import { ScreenProps } from '../navigation';
 const HIDDEN_LOCK_TAPS = 10;
 
 export default function LeaguesScreen({ navigation }: ScreenProps<'Leagues'>) {
-  const { state, ready, prefs, toggleFavLeague, dispatch } = useStore();
+  const { state, ready, prefs, toggleFavLeague, dispatch, refresh, synced } = useStore();
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = async () => { setRefreshing(true); try { await refresh(); } finally { setRefreshing(false); } };
   const { role, isAdmin, user, unlock, lock, signOut, signInWithGoogle, appleAvailable, signInWithApple, authBusy, lastError, canScore, isOwner, redeemCode, createCreationCode } = useAdmin();
   const [askPw, setAskPw] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -65,7 +67,7 @@ export default function LeaguesScreen({ navigation }: ScreenProps<'Leagues'>) {
     .filter(l => l.kind !== 'recreational' && !l.isArchived)
     .filter(l => !q || l.name.toLowerCase().includes(q) || l.season.toLowerCase().includes(q))
     .sort((a, b) => Number(favLeagues.has(b.id)) - Number(favLeagues.has(a.id)));
-  const showSearch = state.leagues.filter(l => l.kind !== 'recreational' && !l.isArchived).length >= 4 || q.length > 0;
+  const showSearch = state.leagues.filter(l => l.kind !== 'recreational' && !l.isArchived).length >= 3 || q.length > 0;
   const archivedLeagues = state.leagues.filter(l => l.isArchived && l.kind !== 'recreational');
 
   const onLockPress = () => {
@@ -225,6 +227,7 @@ Share this with the organizer. It can create exactly one league, then expires.`)
         data={leagueList}
         keyExtractor={l => l.id}
         contentContainerStyle={{ paddingHorizontal: space(4), paddingBottom: space(40) }}
+        refreshControl={synced ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brandTeal} colors={[colors.brandTeal]} /> : undefined}
         ListHeaderComponent={(() => {
           if (q) return null; // rec drop-in cards aren't part of search results
           const recs = visibleLeagues.filter(l => l.kind === 'recreational');

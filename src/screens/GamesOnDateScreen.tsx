@@ -59,11 +59,11 @@ export default function GamesOnDateScreen({ route, navigation }: ScreenProps<'Ga
             <Txt k="body" color={colors.brandTeal} style={{ fontSize: 13 }}>✕</Txt>
           </Pressable>
         ) : null}
-        {scorer ? (
-          <Txt k="body" color={colors.muted} style={{ fontSize: 12, marginBottom: space(2) }}>Swipe a game left to delete.</Txt>
-        ) : (
+        {owner ? (
+          <Txt k="body" color={colors.muted} style={{ fontSize: 12, marginBottom: space(2) }}>Swipe a game to the left to delete it.</Txt>
+        ) : !scorer ? (
           <Txt k="body" color={colors.muted} style={{ fontSize: 12, marginBottom: space(2) }}>Live games open in spectator mode — sign in with a scorekeeper or owner account to track stats.</Txt>
-        )}
+        ) : null}
       </View>
 
       <ScrollView contentContainerStyle={{ padding: space(4), paddingBottom: space(16) }}>

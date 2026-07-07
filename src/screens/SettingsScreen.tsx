@@ -106,14 +106,6 @@ export default function SettingsScreen({ navigation }: ScreenProps<'Settings'>) 
         )}
       </Card>
 
-      {/* Stat tracking moved to per-league settings */}
-      <Card>
-        <Txt k="label" style={{ marginBottom: space(2) }}>Stat tracking</Txt>
-        <Txt k="body" color={colors.muted}>
-          "Track missed shots" is set per league — league owners open the league and tap the ⚙ button next to its name to change it.
-        </Txt>
-      </Card>
-
       {/* Danger zone — only meaningful when an actual account exists */}
       {user ? (
         <Card style={{ marginTop: space(4), borderColor: colors.red }}>

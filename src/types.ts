@@ -71,6 +71,9 @@ export interface League {
   isShared?: boolean; // recreational only: the community drop-in space any signed-in user can write to
   isClosed?: boolean; // season officially complete — unlocks final awards (Mythical Five)
   isArchived?: boolean; // hidden everywhere; Super Admins can view/unarchive
+  // Transient redo stash (per gameId) — lives only in memory, never synced or
+  // saved. Populated by UNDO_EVENT, drained by REDO_EVENT, cleared by ADD_EVENT.
+  _redo?: Record<string, GameEvent[]>;
   teams: Team[];
   players: Player[]; // league-scoped player pool
   games: Game[];

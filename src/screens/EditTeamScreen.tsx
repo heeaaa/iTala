@@ -45,6 +45,7 @@ export default function EditTeamScreen({ route, navigation }: ScreenProps<'EditT
   const [name, setName] = useState(team?.name ?? '');
   const [coach, setCoach] = useState(team?.coach ?? '');
   const [customHex, setCustomHex] = useState('');
+  const [moreColors, setMoreColors] = useState(false);
   const [hexError, setHexError] = useState(false);
   const [newName, setNewName] = useState('');
   const [newNum, setNewNum] = useState('');
@@ -57,8 +58,12 @@ export default function EditTeamScreen({ route, navigation }: ScreenProps<'EditT
 
   if (!league || !team) return <Screen><Txt k="body">Team not found.</Txt></Screen>;
 
-  const commitName = () => dispatch({ t: 'UPDATE_TEAM', leagueId, teamId, name });
-  const commitCoach = () => dispatch({ t: 'UPDATE_TEAM', leagueId, teamId, coach });
+  const [savedTick, setSavedTick] = useState(false);
+  const saveDetails = () => {
+    dispatch({ t: 'UPDATE_TEAM', leagueId, teamId, name, coach });
+    setSavedTick(true);
+    setTimeout(() => setSavedTick(false), 1800);
+  };
 
   const pickLogo = async () => {
     try {
@@ -119,12 +124,12 @@ export default function EditTeamScreen({ route, navigation }: ScreenProps<'EditT
 
         <Field label="Team name" value={name} onChangeText={setName} />
         <Field label="Coach (optional)" value={coach} onChangeText={setCoach} placeholder="Coach Bogs" />
-        <Pressable onPress={commitCoach} style={{ marginTop: -space(1), marginBottom: space(3) }}>
-          <Txt k="body" color={colors.accent}>Save coach</Txt>
-        </Pressable>
-        <Pressable onPress={commitName} style={{ marginTop: -space(1), marginBottom: space(3) }}>
-          <Txt k="body" color={colors.accent}>Save name</Txt>
-        </Pressable>
+        <Button
+          title={savedTick ? '✓ Saved' : 'Save details'}
+          kind={savedTick ? 'ghost' : 'primary'}
+          onPress={saveDetails}
+          style={{ marginTop: space(1), marginBottom: space(4) }}
+        />
 
         {/* Color */}
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
@@ -138,6 +143,11 @@ export default function EditTeamScreen({ route, navigation }: ScreenProps<'EditT
           ))}
         </View>
 
+        <Pressable onPress={() => setMoreColors(v => !v)} style={{ paddingVertical: 6, marginBottom: 8 }}>
+          <Txt k="body" color={colors.accent}>{moreColors ? '▾ Hide more colors' : '▸ More colors'}</Txt>
+        </Pressable>
+
+        {moreColors && (<>
         <Txt k="label" color={colors.muted} style={{ marginBottom: 8 }}>More shades</Txt>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginBottom: space(3) }}>
           {SHADE_GRID.map(c => (
@@ -167,6 +177,7 @@ export default function EditTeamScreen({ route, navigation }: ScreenProps<'EditT
             }} />
         </View>
         {hexError ? <Txt k="body" color={colors.red} style={{ fontSize: 12, marginBottom: space(4) }}>Enter a 6-digit hex code, e.g. 1A6FEB.</Txt> : null}
+        </>)}
 
         {/* Logo */}
         <Txt k="label" style={{ marginBottom: 8 }}>Team logo</Txt>
@@ -185,13 +196,13 @@ export default function EditTeamScreen({ route, navigation }: ScreenProps<'EditT
             {roster.map(p => (
               <View key={p.id} style={{ flexDirection: 'row', gap: 8, alignItems: 'center', marginBottom: 8 }}>
                 <TextInput
-                  value={drafts[p.id]?.num ?? ''} keyboardType="number-pad" placeholder="#" placeholderTextColor={colors.muted}
+                  value={drafts[p.id]?.num ?? p.number ?? ''} keyboardType="number-pad" placeholder="#" placeholderTextColor={colors.muted}
                   onChangeText={v => setDrafts(d => ({ ...d, [p.id]: { name: d[p.id]?.name ?? p.name, num: v } }))}
                   onEndEditing={() => commitPlayer(p)}
                   style={{ width: 52, backgroundColor: colors.surface, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.line, color: colors.text, paddingHorizontal: 10, paddingVertical: 10, fontFamily: font.body, textAlign: 'center' }}
                 />
                 <TextInput
-                  value={drafts[p.id]?.name ?? ''} placeholder="Name" placeholderTextColor={colors.muted}
+                  value={drafts[p.id]?.name ?? p.name} placeholder="Name" placeholderTextColor={colors.muted}
                   onChangeText={v => setDrafts(d => ({ ...d, [p.id]: { num: d[p.id]?.num ?? p.number ?? '', name: v } }))}
                   onEndEditing={() => commitPlayer(p)}
                   style={{ flex: 1, backgroundColor: colors.surface, borderRadius: radius.sm, borderWidth: 1, borderColor: colors.line, color: colors.text, paddingHorizontal: 12, paddingVertical: 10, fontFamily: font.body }}

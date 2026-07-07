@@ -437,6 +437,9 @@ function BoxTable({ lines, total, nameOf, trackMisses, trackTurnovers }: { lines
           </View>
         </View>
       </ScrollView>
+      <Txt k="body" color={colors.muted} style={{ fontSize: 11, marginTop: 8, textAlign: 'center' }}>
+        Swipe the table sideways to see all columns →
+      </Txt>
     </Card>
   );
 }

@@ -21,6 +21,7 @@ export type Action =
   | { t: 'SUBSTITUTE'; leagueId: string; gameId: string; side: 'home' | 'away'; outId: string; inId: string }
   | { t: 'ADD_EVENT'; leagueId: string; gameId: string; teamId: string; playerId: string | null; type: EventType; period: number; note?: string }
   | { t: 'UNDO_EVENT'; leagueId: string; gameId: string }
+  | { t: 'REDO_EVENT'; leagueId: string; gameId: string }
   | { t: 'DELETE_EVENT'; leagueId: string; eventId: string }
   | { t: 'DELETE_GAME'; leagueId: string; gameId: string }
   | { t: 'SET_GAME_STATUS'; leagueId: string; gameId: string; status: Game['status'] }
@@ -186,6 +187,7 @@ function reducer(state: AppState, a: Action): AppState {
           note: a.note,
         };
         const events = [...l.events, ev];
+        const clearedRedo = l._redo ? { ...l._redo, [a.gameId]: [] } : undefined;
 
         // Foul-out: if this foul reaches the limit, pull the player off the court automatically.
         let games = l.games;
@@ -206,15 +208,27 @@ function reducer(state: AppState, a: Action): AppState {
             });
           }
         }
-        return { ...l, events, games };
+        return { ...l, events, games, _redo: clearedRedo };
       });
 
     case 'UNDO_EVENT':
       return mapLeague(state, a.leagueId, l => {
         const ofGame = l.events.filter(e => e.gameId === a.gameId);
         if (ofGame.length === 0) return l;
-        const lastId = ofGame[ofGame.length - 1].id;
-        return { ...l, events: l.events.filter(e => e.id !== lastId) };
+        const last = ofGame[ofGame.length - 1];
+        const redo = { ...(l._redo ?? {}) };
+        redo[a.gameId] = [...(redo[a.gameId] ?? []), last]; // push onto the redo stack
+        return { ...l, events: l.events.filter(e => e.id !== last.id), _redo: redo };
+      });
+
+    case 'REDO_EVENT':
+      return mapLeague(state, a.leagueId, l => {
+        const stack = l._redo?.[a.gameId] ?? [];
+        if (stack.length === 0) return l;
+        const ev = stack[stack.length - 1];
+        const redo = { ...(l._redo ?? {}) };
+        redo[a.gameId] = stack.slice(0, -1);
+        return { ...l, events: [...l.events, ev], _redo: redo };
       });
 
     case 'DELETE_EVENT':
@@ -340,6 +354,7 @@ interface Ctx {
   ready: boolean;
   /** True when the app is connected to Supabase and syncing across devices. */
   synced: boolean;
+  refresh: () => Promise<void>;
   /** Device-local favorites (leagues/teams pinned to the top of lists). */
   prefs: LocalPrefs;
   toggleFavLeague: (leagueId: string) => void;
@@ -453,6 +468,20 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     return unsubscribe;
   }, [ready]);
 
+  // Manual refresh for pull-to-refresh: re-pull the full server state now.
+  const refresh = useCallback(async () => {
+    if (!SYNC_ENABLED) return;
+    const sb = getSupabase();
+    if (!sb) return;
+    const remote = await fetchAllState(sb);
+    if (remote && remote.leagues) {
+      baseDispatch({ t: 'HYDRATE', state: {
+        leagues: remote.leagues,
+        settings: remote.settings ?? stateRef.current.settings,
+      } });
+    }
+  }, []);
+
   // Wrapped dispatch: apply the action locally, then push the resulting state
   // to Supabase. We compute the post-dispatch state inline via the reducer so
   // pushAction sees the exact rows we want to mirror — no React render gap.
@@ -489,7 +518,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     saveState(state);
   }, [state, ready]);
 
-  return <StoreCtx.Provider value={{ state, dispatch, ready, synced: SYNC_ENABLED, prefs, toggleFavLeague, toggleFavTeam }}>{children}</StoreCtx.Provider>;
+  return <StoreCtx.Provider value={{ state, dispatch, ready, synced: SYNC_ENABLED, refresh, prefs, toggleFavLeague, toggleFavTeam }}>{children}</StoreCtx.Provider>;
 }
 
 export function useStore(): Ctx {

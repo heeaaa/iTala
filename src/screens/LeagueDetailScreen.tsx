@@ -49,6 +49,37 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
             </Pressable>
           )}
         </View>
+        {/* LIVE NOW — front and center, above the tabs (hidden in settings mode) */}
+        {!showSettings && league.games.filter(g => g.status === 'live').map(g => {
+          const h = league.teams.find(t => t.id === g.homeTeamId);
+          const a = league.teams.find(t => t.id === g.awayTeamId);
+          const sc = gameScore(league, g);
+          return (
+            <Pressable key={g.id}
+              onPress={() => navigation.navigate('LiveGame', { leagueId, gameId: g.id, spectator: !scorer })}
+              style={{ marginTop: space(3), backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.brandTeal, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <LivePip size={8} />
+              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <TeamBadge logo={h?.logo} color={h?.color ?? colors.muted} size={14} />
+                <Txt k="body" numberOfLines={1} style={{ flexShrink: 1 }}>{h?.name}</Txt>
+                <Txt k="stat" color={colors.accent}>{sc.home}–{sc.away}</Txt>
+                <Txt k="body" numberOfLines={1} style={{ flexShrink: 1 }}>{a?.name}</Txt>
+                <TeamBadge logo={a?.logo} color={a?.color ?? colors.muted} size={14} />
+              </View>
+              <Txt k="label" color={colors.brandLime}>WATCH</Txt>
+            </Pressable>
+          );
+        })}
+        {!showSettings && (
+          <View style={{ marginTop: space(3) }}>
+            <Segmented options={['Standings', 'Leaders', 'Games', 'Roster']} value={tab} onChange={setTab} />
+          </View>
+        )}
+      </View>
+
+      <ScrollView contentContainerStyle={{ padding: space(4), paddingBottom: space(28) }}>
+        {/* Settings live INSIDE the scroll view so long content (codes, members,
+            duplicate, archive) is always reachable. */}
         {owner && showSettings && (
           <Card style={{ marginTop: space(3) }}>
             <Txt k="label" style={{ marginBottom: space(2) }}>League settings</Txt>
@@ -137,34 +168,8 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
             )}
           </Card>
         )}
-        {/* LIVE NOW — front and center, above the tabs */}
-        {league.games.filter(g => g.status === 'live').map(g => {
-          const h = league.teams.find(t => t.id === g.homeTeamId);
-          const a = league.teams.find(t => t.id === g.awayTeamId);
-          const sc = gameScore(league, g);
-          return (
-            <Pressable key={g.id}
-              onPress={() => navigation.navigate('LiveGame', { leagueId, gameId: g.id, spectator: !scorer })}
-              style={{ marginTop: space(3), backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.brandTeal, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <LivePip size={8} />
-              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <TeamBadge logo={h?.logo} color={h?.color ?? colors.muted} size={14} />
-                <Txt k="body" numberOfLines={1} style={{ flexShrink: 1 }}>{h?.name}</Txt>
-                <Txt k="stat" color={colors.accent}>{sc.home}–{sc.away}</Txt>
-                <Txt k="body" numberOfLines={1} style={{ flexShrink: 1 }}>{a?.name}</Txt>
-                <TeamBadge logo={a?.logo} color={a?.color ?? colors.muted} size={14} />
-              </View>
-              <Txt k="label" color={colors.brandLime}>WATCH</Txt>
-            </Pressable>
-          );
-        })}
-        <View style={{ marginTop: space(3) }}>
-          <Segmented options={['Standings', 'Leaders', 'Games', 'Roster']} value={tab} onChange={setTab} />
-        </View>
-      </View>
 
-      <ScrollView contentContainerStyle={{ padding: space(4), paddingBottom: space(28) }}>
-        {tab === 2 && (
+        {!showSettings && tab === 2 && (
           league.games.length === 0
             ? <Empty title="No games yet" subtitle="Tap Start Game to keep stats live." />
             : (() => {
@@ -229,7 +234,7 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
               })()
         )}
 
-        {tab === 0 && (
+        {!showSettings && tab === 0 && (
           <Card style={{ padding: space(2) }}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View>
@@ -266,7 +271,7 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
           </Card>
         )}
 
-        {tab === 1 && (
+        {!showSettings && tab === 1 && (
           (() => {
             const rows = leaderboards(league);
             if (rows.length === 0) return <Empty title="No stats yet" subtitle="Play a game to populate the leaderboard." />;
@@ -356,7 +361,7 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
           })()
         )}
 
-        {tab === 3 && (
+        {!showSettings && tab === 3 && (
           <>
             <TextInput
               value={rosterQuery} onChangeText={setRosterQuery}

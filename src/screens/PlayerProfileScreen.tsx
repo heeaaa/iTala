@@ -115,17 +115,22 @@ export default function PlayerProfileScreen({ route }: ScreenProps<'PlayerProfil
             </View>
           </Card>
 
-          <Card style={{ marginBottom: space(3) }}>
-            <Txt k="label" style={{ marginBottom: space(2) }}>Shooting splits</Txt>
-            <View style={{ flexDirection: 'row' }}>
-              <Split label="FG" makes={c.fgm} att={c.fga} pctStr={c.fgPct} />
-              <Split label="3PT" makes={c.tpm} att={c.tpa} pctStr={c.tpPct} />
-              <Split label="FT" makes={c.ftm} att={c.fta} pctStr={c.ftPct} />
-            </View>
-          </Card>
+          {(league.trackMisses ?? true) && (
+            <Card style={{ marginBottom: space(3) }}>
+              <Txt k="label" style={{ marginBottom: space(2) }}>Shooting splits</Txt>
+              <View style={{ flexDirection: 'row' }}>
+                <Split label="FG" makes={c.fgm} att={c.fga} pctStr={c.fgPct} />
+                <Split label="3PT" makes={c.tpm} att={c.tpa} pctStr={c.tpPct} />
+                <Split label="FT" makes={c.ftm} att={c.fta} pctStr={c.ftPct} />
+              </View>
+            </Card>
+          )}
 
           <Card style={{ marginBottom: space(3) }}>
-            <Txt k="label" style={{ marginBottom: 4 }}>Career highs</Txt>
+            <Txt k="label" style={{ marginBottom: 2 }}>Career highs</Txt>
+            <Txt k="body" color={colors.muted} style={{ fontSize: 11, marginBottom: space(2) }}>
+              Single-game bests across all {c.gp} games — each number may come from a different game.
+            </Txt>
             {([
               ['Points', c.highPts],
               ['Rebounds', c.highReb],
@@ -141,18 +146,26 @@ export default function PlayerProfileScreen({ route }: ScreenProps<'PlayerProfil
                 </View>
               ))}
             {c.bestGame ? (
-              <Txt k="body" color={colors.muted} style={{ marginTop: 10 }}>
-                Best night: {([
-                  ['pts', c.bestGame.pts],
-                  ['ast', c.bestGame.ast],
-                  ['reb', c.bestGame.reb],
-                  ['stl', c.bestGame.stl],
-                  ['blk', c.bestGame.blk],
-                ] as [string, number][])
-                  .filter(([, v]) => v > 0)
-                  .map(([label, v]) => `${v} ${label}`)
-                  .join(' / ')}
-              </Txt>
+              <View style={{ marginTop: space(3), borderTopWidth: 1, borderTopColor: colors.line, paddingTop: space(2) }}>
+                <Txt k="label" color={colors.brandTeal} style={{ fontSize: 10, marginBottom: 4 }}>BEST ALL-AROUND GAME</Txt>
+                <Txt k="body">
+                  {([
+                    ['PTS', c.bestGame.pts],
+                    ['REB', c.bestGame.reb],
+                    ['AST', c.bestGame.ast],
+                    ['STL', c.bestGame.stl],
+                    ['BLK', c.bestGame.blk],
+                  ] as [string, number][])
+                    .filter(([, v]) => v > 0)
+                    .map(([label, v]) => `${v} ${label}`)
+                    .join(' · ')}
+                </Txt>
+                {c.bestGame.matchup ? (
+                  <Txt k="body" color={colors.muted} style={{ fontSize: 12, marginTop: 2 }}>
+                    {c.bestGame.matchup} · {c.bestGame.score}{c.bestGame.dateMs ? ` · ${dateLabel(c.bestGame.dateMs)}` : ''}
+                  </Txt>
+                ) : null}
+              </View>
             ) : null}
           </Card>
 

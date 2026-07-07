@@ -14,7 +14,9 @@ export async function loadState(): Promise<AppState | null> {
 
 export async function saveState(state: AppState): Promise<void> {
   try {
-    await AsyncStorage.setItem(KEY, JSON.stringify(state));
+    // Strip the transient per-game redo stash — it must never persist or sync.
+    const clean = { ...state, leagues: state.leagues.map(({ _redo, ...l }) => l) };
+    await AsyncStorage.setItem(KEY, JSON.stringify(clean));
   } catch {
     // best-effort; a failed write should never crash a live game
   }
