@@ -201,9 +201,13 @@ export interface LeagueAwards {
   mythicalFive: AwardWinner[];        // top 5 by composite rating
 }
 
-export function leagueAwards(league: League): LeagueAwards {
-  const rows = leaderboards(league);
-  const logs = gameLogs(league);
+export function leagueAwards(league: League, opts?: { restrictTeamIds?: Set<string> }): LeagueAwards {
+  // League rule: award winners must come from the top teams in the standings
+  // (pass the eligible team ids in restrictTeamIds).
+  const restrict = opts?.restrictTeamIds;
+  const inScope = (teamId: string | null | undefined) => !restrict || (!!teamId && restrict.has(teamId));
+  const rows = leaderboards(league).filter(r => inScope(r.teamId));
+  const logs = gameLogs(league).filter(gl => inScope(gl.teamId));
   const nameOf = (pid: string) => league.players.find(p => p.id === pid)?.name ?? '?';
   const teamOf = (pid: string, tid?: string) =>
     (tid && league.teams.find(t => t.id === tid)?.name) ??
@@ -394,6 +398,52 @@ export function teamPeriodFouls(league: League, gameId: string, teamId: string, 
   return league.events.filter(
     e => e.gameId === gameId && e.teamId === teamId && e.type === 'pf' && e.period === period
   ).length;
+}
+
+export function teamPeriodTimeouts(league: League, gameId: string, teamId: string, period: number): number {
+  return league.events.filter(
+    e => e.gameId === gameId && e.teamId === teamId && e.type === 'timeout' && e.period === period
+  ).length;
+}
+
+// Games played per player, attendance-aware: a recorded attendance list is the
+// truth for that game (covers benched-but-present players); games without one
+// fall back to "recorded a stat = played".
+export function gamesPlayedMap(league: League): Map<string, number> {
+  const gp = new Map<string, number>();
+  const bump = (pid: string) => gp.set(pid, (gp.get(pid) ?? 0) + 1);
+  for (const g of league.games) {
+    if (g.status !== 'final') continue;
+    if (g.attendance) {
+      for (const pid of g.attendance) bump(pid);
+    } else {
+      const seen = new Set<string>();
+      for (const teamId of [g.homeTeamId, g.awayTeamId]) {
+        for (const l of teamBoxScore(league, g.id, teamId).lines) {
+          if (!l.playerId || seen.has(l.playerId)) continue;
+          const touched = l.pts || l.reb || l.ast || l.stl || l.blk || l.fga || l.fta || l.tov || l.pf;
+          if (touched) { seen.add(l.playerId); bump(l.playerId); }
+        }
+      }
+    }
+  }
+  return gp;
+}
+
+// Player ids that recorded any stat in a game — the auto-present set that
+// seeds the attendance sheet.
+export function statPlayersOfGame(league: League, gameId: string): Set<string> {
+  const g = league.games.find(x => x.id === gameId);
+  const out = new Set<string>();
+  if (!g) return out;
+  for (const teamId of [g.homeTeamId, g.awayTeamId]) {
+    for (const l of teamBoxScore(league, gameId, teamId).lines) {
+      if (!l.playerId) continue;
+      const touched = l.pts || l.reb || l.ast || l.stl || l.blk || l.fga || l.fta || l.tov || l.pf;
+      if (touched) out.add(l.playerId);
+    }
+  }
+  return out;
 }
 
 // Set of player ids on a team that have fouled out of this game.

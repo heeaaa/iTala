@@ -8,7 +8,7 @@ import { useStore, useLeague } from '../store/StoreProvider';
 import { useAdmin } from '../store/AdminProvider';
 import { colors, space, radius, font, brandGradient, wordmarkGradient } from '../theme';
 import { ScreenProps } from '../navigation';
-import { teamBoxScore, gameScore, lineScore } from '../lib/stats';
+import { teamBoxScore, gameScore, lineScore, statPlayersOfGame } from '../lib/stats';
 import { pct } from '../lib/format';
 import { StatLine, EventType } from '../types';
 
@@ -21,11 +21,16 @@ const EV_LABEL: Record<EventType, string> = {
 export default function BoxScoreScreen({ route, navigation }: ScreenProps<'BoxScore'>) {
   const { leagueId, gameId } = route.params;
   const { state, dispatch } = useStore();
-  const { role, signInWithGoogle, appleAvailable, signInWithApple, authBusy, lastError } = useAdmin();
+  const { role, canScore, signInWithGoogle, appleAvailable, signInWithApple, authBusy, lastError } = useAdmin();
   const league = useLeague(leagueId);
   const game = league?.games.find(g => g.id === gameId);
   const [side, setSide] = useState(0);
   const [askSignIn, setAskSignIn] = useState(false);
+  const [attOpen, setAttOpen] = useState(false);
+  // Attendance draft: starts from what's saved, else auto-seeds with everyone
+  // who recorded a stat ("played = present"). Benched-but-present players get
+  // checked manually.
+  const [attDraft, setAttDraft] = useState<Set<string> | null>(null);
   const cardRef = useRef<View>(null);
 
   if (!league || !game) return <Screen><Txt k="body">Game not found.</Txt></Screen>;
@@ -158,8 +163,79 @@ export default function BoxScoreScreen({ route, navigation }: ScreenProps<'BoxSc
 
         <Button title="Share box-score card" onPress={onSharePress} kind="ghost" style={{ marginBottom: space(2) }} />
         {game.status === 'final' && (
-          <Button title="⇩ Export box score (CSV)" onPress={() => { void exportCsv(); }} kind="ghost" style={{ marginBottom: space(3) }} />
+          <Button title="⇩ Export box score (CSV)" onPress={() => { void exportCsv(); }} kind="ghost" style={{ marginBottom: space(2) }} />
         )}
+        {game.status === 'final' && league && canScore(league) && (
+          <Button
+            title={game.attendance ? `📋 Attendance (${game.attendance.length} present)` : '📋 Record attendance'}
+            kind="ghost"
+            style={{ marginBottom: space(3) }}
+            onPress={() => {
+              setAttDraft(new Set(game.attendance ?? [...statPlayersOfGame(league, gameId)]));
+              setAttOpen(true);
+            }}
+          />
+        )}
+        {attOpen && attDraft && league && (() => {
+          const auto = statPlayersOfGame(league, gameId);
+          const toggle = (pid: string) => setAttDraft(prev => {
+            const next = new Set(prev);
+            if (next.has(pid)) next.delete(pid); else next.add(pid);
+            return next;
+          });
+          const teamBlock = (teamId: string) => {
+            const team = league.teams.find(t => t.id === teamId);
+            if (!team || team.teamOnly) return null;
+            const roster = team.playerIds
+              .map(pid => league.players.find(pl => pl.id === pid))
+              .filter((pl): pl is NonNullable<typeof pl> => !!pl)
+              .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+            return (
+              <View key={teamId} style={{ marginTop: space(2) }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <TeamBadge logo={team.logo} color={team.color} size={13} />
+                  <Txt k="label">{team.name}</Txt>
+                </View>
+                {roster.map(pl => {
+                  const present = attDraft.has(pl.id);
+                  const played = auto.has(pl.id);
+                  return (
+                    <Pressable key={pl.id} onPress={() => toggle(pl.id)}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8 }}>
+                      <View style={{
+                        width: 22, height: 22, borderRadius: 6, borderWidth: 2,
+                        borderColor: present ? colors.brandTeal : colors.line,
+                        backgroundColor: present ? colors.brandTeal : 'transparent',
+                        alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        {present ? <Txt k="body" color={colors.bg} style={{ fontSize: 14, lineHeight: 18 }}>✓</Txt> : null}
+                      </View>
+                      <Txt k="body" style={{ flex: 1 }}>{pl.number ? `#${pl.number} ` : ''}{pl.name}</Txt>
+                      {played && <Pill label="PLAYED" color={colors.accentDim} textColor={colors.brandTeal} />}
+                    </Pressable>
+                  );
+                })}
+              </View>
+            );
+          };
+          return (
+            <Card style={{ marginBottom: space(3), borderColor: colors.brandTeal }}>
+              <Txt k="label" color={colors.brandTeal}>📋 Attendance</Txt>
+              <Txt k="body" color={colors.muted} style={{ fontSize: 12, marginTop: 2 }}>
+                Players with stats are checked automatically. Tap to check benched players who were present — attendance counts toward Games Played on the roster.
+              </Txt>
+              {teamBlock(game.homeTeamId)}
+              {teamBlock(game.awayTeamId)}
+              <View style={{ flexDirection: 'row', gap: 8, marginTop: space(3) }}>
+                <Button title="Cancel" kind="ghost" style={{ flex: 1 }} onPress={() => setAttOpen(false)} />
+                <Button title="Save attendance" style={{ flex: 1 }} onPress={() => {
+                  dispatch({ t: 'SET_ATTENDANCE', leagueId, gameId, playerIds: [...attDraft] });
+                  setAttOpen(false);
+                }} />
+              </View>
+            </Card>
+          );
+        })()}
 
         <Segmented options={[homeTeam.name, awayTeam.name]} value={side} onChange={setSide} />
         <View style={{ height: space(3) }} />

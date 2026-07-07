@@ -1,5 +1,7 @@
 import React, { useRef, useState } from 'react';
-import { View, FlatList, Pressable, Alert, TextInput } from 'react-native';
+import { View, FlatList, Pressable, Alert, TextInput, ScrollView, Dimensions } from 'react-native';
+
+const SCREEN_W = Dimensions.get('window').width;
 import {
   Screen, Txt, Card, Button, Pill, Empty, Wordmark, PasswordModal, LivePip,
   ProfileButton, ProfileSheet, InviteCodeModal,
@@ -15,13 +17,14 @@ import { ScreenProps } from '../navigation';
 const HIDDEN_LOCK_TAPS = 10;
 
 export default function LeaguesScreen({ navigation }: ScreenProps<'Leagues'>) {
-  const { state, ready, prefs, toggleFavLeague } = useStore();
+  const { state, ready, prefs, toggleFavLeague, dispatch } = useStore();
   const { role, isAdmin, user, unlock, lock, signOut, signInWithGoogle, appleAvailable, signInWithApple, authBusy, lastError, canScore, isOwner, redeemCode, createCreationCode } = useAdmin();
   const [askPw, setAskPw] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [lockRevealed, setLockRevealed] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
   const [codeOpen, setCodeOpen] = useState(false);
   const [codeBusy, setCodeBusy] = useState(false);
   const [codeError, setCodeError] = useState<string | null>(null);
@@ -44,27 +47,26 @@ export default function LeaguesScreen({ navigation }: ScreenProps<'Leagues'>) {
   // that are either the shared community one or ones this user owns. Other
   // people's personal drop-in spaces stay out of sight.
   const visibleLeagues = state.leagues.filter(
-    l => l.kind !== 'recreational' || l.isShared || isOwner(l)
+    l => !l.isArchived && (l.kind !== 'recreational' || l.isShared || isOwner(l))
   );
 
-  // Resume banner: any visible league with a live game
-  const liveRef = (() => {
-    for (const l of visibleLeagues) {
-      const g = l.games.find(g => g.status === 'live');
-      if (g) return { leagueId: l.id, gameId: g.id, leagueName: l.name, league: l };
-    }
-    return null;
-  })();
+  // Live banner: EVERY live game across all visible leagues (a Saturday can
+  // have several leagues playing at once).
+  const liveRefs = visibleLeagues.flatMap(l =>
+    l.games.filter(g => g.status === 'live')
+      .map(g => ({ leagueId: l.id, gameId: g.id, leagueName: l.name, league: l }))
+  );
 
   // Search + favorites. Favorites float to the top (stable within groups so
   // the newest-first creation order is otherwise preserved).
   const favLeagues = new Set(prefs.favLeagueIds);
   const q = query.trim().toLowerCase();
   const leagueList = state.leagues
-    .filter(l => l.kind !== 'recreational')
+    .filter(l => l.kind !== 'recreational' && !l.isArchived)
     .filter(l => !q || l.name.toLowerCase().includes(q) || l.season.toLowerCase().includes(q))
     .sort((a, b) => Number(favLeagues.has(b.id)) - Number(favLeagues.has(a.id)));
-  const showSearch = state.leagues.filter(l => l.kind !== 'recreational').length >= 4 || q.length > 0;
+  const showSearch = state.leagues.filter(l => l.kind !== 'recreational' && !l.isArchived).length >= 4 || q.length > 0;
+  const archivedLeagues = state.leagues.filter(l => l.isArchived && l.kind !== 'recreational');
 
   const onLockPress = () => {
     if (isAdmin) { void lock(); return; } // tapping the unlocked icon re-locks
@@ -175,26 +177,38 @@ Share this with the organizer. It can create exactly one league, then expires.`)
         </View>
       )}
 
-      {liveRef && (
-        <Pressable
-          onPress={() => navigation.navigate('LiveGame', { leagueId: liveRef.leagueId, gameId: liveRef.gameId, spectator: !canScore(liveRef.league) })}
-          style={{
-            marginHorizontal: space(4), marginBottom: space(3),
-            backgroundColor: colors.surface, borderRadius: 14, padding: 14,
-            borderWidth: 1, borderColor: colors.brandTeal,
-            flexDirection: 'row', alignItems: 'center', gap: 12,
-          }}>
-          {/* Teal vertical accent stripe */}
-          <View style={{ width: 4, alignSelf: 'stretch', backgroundColor: colors.brandTeal, borderRadius: 2 }} />
-          <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
-              <LivePip size={7} />
-              <Txt k="label" color={colors.brandLime}>Live now</Txt>
-            </View>
-            <Txt k="h2" color={colors.text}>{liveRef.leagueName}</Txt>
-          </View>
-          <Txt k="h1" color={colors.brandTeal}>▶</Txt>
-        </Pressable>
+      {liveRefs.length > 0 && (
+        // One live game → full-width card. Several → horizontal carousel so
+        // every court gets a card; peek of the next card invites the swipe.
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          snapToAlignment="start"
+          decelerationRate="fast"
+          style={{ flexGrow: 0, marginBottom: space(3) }}
+          contentContainerStyle={{ paddingHorizontal: space(4), gap: 10 }}>
+          {liveRefs.map(ref => (
+            <Pressable
+              key={ref.gameId}
+              onPress={() => navigation.navigate('LiveGame', { leagueId: ref.leagueId, gameId: ref.gameId, spectator: !canScore(ref.league) })}
+              style={{
+                width: liveRefs.length === 1 ? SCREEN_W - space(4) * 2 : SCREEN_W * 0.78,
+                backgroundColor: colors.surface, borderRadius: 14, padding: 14,
+                borderWidth: 1, borderColor: colors.brandTeal,
+                flexDirection: 'row', alignItems: 'center', gap: 12,
+              }}>
+              <View style={{ width: 4, alignSelf: 'stretch', backgroundColor: colors.brandTeal, borderRadius: 2 }} />
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 }}>
+                  <LivePip size={7} />
+                  <Txt k="label" color={colors.brandLime}>Live now</Txt>
+                </View>
+                <Txt k="h2" color={colors.text} numberOfLines={1}>{ref.leagueName}</Txt>
+              </View>
+              <Txt k="h1" color={colors.brandTeal}>▶</Txt>
+            </Pressable>
+          ))}
+        </ScrollView>
       )}
 
       {showSearch && (
@@ -243,6 +257,27 @@ Share this with the organizer. It can create exactly one league, then expires.`)
           );
         })()}
         ListEmptyComponent={ready ? (q ? <Empty title="No matches" subtitle={`No league matches "${query}".`} /> : <Empty title="No leagues yet" subtitle="Create your first league to start tracking games." />) : null}
+        ListFooterComponent={isAdmin && archivedLeagues.length > 0 ? (
+          <View style={{ marginTop: space(2) }}>
+            <Pressable onPress={() => setShowArchived(v => !v)} style={{ paddingVertical: 10 }}>
+              <Txt k="body" color={colors.muted}>
+                {showArchived ? '▾' : '▸'} 🗄 Archived leagues ({archivedLeagues.length}) — Super Admins only
+              </Txt>
+            </Pressable>
+            {showArchived && archivedLeagues.map(l => (
+              <Card key={l.id} style={{ marginBottom: space(3), opacity: 0.75 }} onPress={() => navigation.navigate('LeagueDetail', { leagueId: l.id })}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <View style={{ flex: 1 }}>
+                    <Txt k="h2">{l.name}</Txt>
+                    <Txt k="body" color={colors.muted}>{l.season} · archived</Txt>
+                  </View>
+                  <Button title="Unarchive" kind="ghost" style={{ paddingVertical: 8, paddingHorizontal: 14 }}
+                    onPress={() => dispatch({ t: 'SET_LEAGUE_SETTINGS', leagueId: l.id, isArchived: false })} />
+                </View>
+              </Card>
+            ))}
+          </View>
+        ) : null}
         renderItem={({ item }) => {
           const finals = item.games.filter(g => g.status === 'final').length;
           const fav = favLeagues.has(item.id);

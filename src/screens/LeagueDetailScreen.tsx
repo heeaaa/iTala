@@ -5,14 +5,14 @@ import { useStore, useLeague } from '../store/StoreProvider';
 import { useAdmin } from '../store/AdminProvider';
 import { colors, space, font, radius } from '../theme';
 import { ScreenProps } from '../navigation';
-import { standings, leaderboards, leagueAwards, winPctOf, gameScore } from '../lib/stats';
+import { standings, leaderboards, leagueAwards, winPctOf, gameScore, gamesPlayedMap } from '../lib/stats';
 import { dayKey, dayLabel, uid } from '../lib/format';
 
 export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'LeagueDetail'>) {
   const { leagueId } = route.params;
   const league = useLeague(leagueId);
   const { dispatch, prefs, toggleFavTeam } = useStore();
-  const { canScore, isOwner, getLeagueCodes, regenerateLeagueCode, listMembers, removeMember, user } = useAdmin();
+  const { canScore, isOwner, isAdmin, getLeagueCodes, regenerateLeagueCode, listMembers, removeMember, user } = useAdmin();
   const [tab, setTab] = useState(0);
   const [rosterQuery, setRosterQuery] = useState('');
   const [teamFilter, setTeamFilter] = useState<string | null>(null);
@@ -65,6 +65,38 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
               value={league.trackTurnovers ?? true}
               onChange={(v) => dispatch({ t: 'SET_LEAGUE_SETTINGS', leagueId, trackTurnovers: v })}
             />
+            <View style={{ height: space(3) }} />
+            <Toggle
+              label="Season complete"
+              description="Marks this league as officially ended: awards become final and the Mythical Five is revealed. You can reopen it if games remain."
+              value={league.isClosed ?? false}
+              onChange={(v) => dispatch({ t: 'SET_LEAGUE_SETTINGS', leagueId, isClosed: v })}
+            />
+
+            {/* Archive — Super Admins only. Hides the league everywhere; reversible. */}
+            {isAdmin && !league.isShared && (
+              <View style={{ marginTop: space(3) }}>
+                <Button
+                  title={league.isArchived ? '📤 Unarchive league' : '🗄 Archive league'}
+                  kind="ghost"
+                  onPress={() => {
+                    if (league.isArchived) {
+                      dispatch({ t: 'SET_LEAGUE_SETTINGS', leagueId, isArchived: false });
+                      return;
+                    }
+                    Alert.alert(
+                      'Archive this league?',
+                      `"${league.name}" will disappear from everyone's home screen. Nothing is deleted — Super Admins can view and unarchive it anytime from the Archived section on the home page.`,
+                      [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Archive', style: 'destructive', onPress: () => dispatch({ t: 'SET_LEAGUE_SETTINGS', leagueId, isArchived: true }) },
+                      ],
+                    );
+                  }}
+                />
+              </View>
+            )}
+
             {/* Duplicate league — new season, same teams/players/settings, zero games */}
             {!league.isShared && (
               <View style={{ marginTop: space(4), borderTopWidth: 1, borderTopColor: colors.line, paddingTop: space(3) }}>
@@ -246,7 +278,12 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
               ['Blocks', r => r.bpg, r => `${r.bpg.toFixed(1)} BPG`],
               ['3-Pointers Made', r => r.tpm, r => `${r.tpm} 3PM`],
             ];
-            const aw = leagueAwards(league);
+            // Awards rules: (a) appear only after the league's 6th completed
+            // game, (b) winners must come from the top 5 teams in the
+            // standings, (c) Mythical Five only when the season is closed.
+            const finalsCount = league.games.filter(g => g.status === 'final').length;
+            const top5Teams = new Set(standings(league).slice(0, 5).map(r => r.team.id));
+            const aw = leagueAwards(league, { restrictTeamIds: top5Teams });
             const AwardRow = ({ icon, title, w }: { icon: string; title: string; w: { name: string; teamName: string; value: string; playerId: string } | null }) => w ? (
               <Pressable onPress={() => navigation.navigate('PlayerProfile', { leagueId, playerId: w.playerId })}
                 style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 8, gap: 10 }}>
@@ -281,9 +318,15 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
                   );
                 })}
 
-                {/* 🏆 AWARDS — computed live from the data, zero manual work */}
+                {/* 🏆 AWARDS — computed live; appear after 6 games; official at season close */}
+                {finalsCount >= 6 && (
                 <Card style={{ marginBottom: space(3), borderColor: colors.brandTeal }}>
-                  <Txt k="label" color={colors.brandTeal} style={{ marginBottom: 4 }}>🏆 League awards</Txt>
+                  <Txt k="label" color={colors.brandTeal}>🏆 League awards</Txt>
+                  <Txt k="body" color={colors.muted} style={{ fontSize: 11, marginBottom: 4 }}>
+                    {league.isClosed
+                      ? 'Final — season complete. Winners from the top 5 teams in the standings.'
+                      : 'Unofficial — rankings AS OF NOW and can still change as games are played. Winners come from the top 5 teams in the standings.'}
+                  </Txt>
                   <AwardRow icon="👑" title="SEASON MVP" w={aw.seasonMVP} />
                   <AwardRow icon="🔥" title="PLAYER OF THE WEEK" w={aw.playerOfWeek} />
                   <AwardRow icon="⭐" title="PLAYER OF THE MONTH" w={aw.playerOfMonth} />
@@ -291,7 +334,12 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
                   <AwardRow icon="🤝" title="ASSIST LEADER" w={aw.assistLeader} />
                   <AwardRow icon="🛡" title="BEST DEFENDER" w={aw.bestDefender} />
                   <AwardRow icon="📈" title="MOST IMPROVED" w={aw.mostImproved} />
-                  {aw.mythicalFive.length >= 5 && (
+                  {!league.isClosed && (
+                    <Txt k="body" color={colors.muted} style={{ fontSize: 11, marginTop: 6 }}>
+                      🏅 The Mythical Five is revealed when the season is marked complete.
+                    </Txt>
+                  )}
+                  {league.isClosed && aw.mythicalFive.length >= 5 && (
                     <View style={{ marginTop: 6, borderTopWidth: 1, borderTopColor: colors.line, paddingTop: 8 }}>
                       <Txt k="label" color={colors.muted} style={{ fontSize: 10, marginBottom: 4 }}>MYTHICAL FIVE</Txt>
                       {aw.mythicalFive.map(w => (
@@ -302,6 +350,7 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
                     </View>
                   )}
                 </Card>
+                )}
               </>
             );
           })()
@@ -316,6 +365,7 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
             />
             {(() => {
               const q = rosterQuery.trim().toLowerCase();
+              const gpMap = gamesPlayedMap(league); // attendance-aware games played
               const teams = teamsFavFirst.map(t => {
                 const teamMatch = t.name.toLowerCase().includes(q);
                 const playersOfTeam = t.playerIds
@@ -346,7 +396,7 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
                     </Pressable>
                     {/* close the profile-link pressable's sibling group */}
                     {t.teamOnly ? <Pill label="opponent" color={colors.surfaceHi} textColor={colors.muted} /> : null}
-                    {owner && (
+                    {scorer && (
                       <Pressable onPress={() => navigation.navigate('EditTeam', { leagueId, teamId: t.id })} hitSlop={8}
                         style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.line }}>
                         <Txt k="body" style={{ fontSize: 13 }}>✎ Edit</Txt>
@@ -358,6 +408,7 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
                       style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 7, gap: 10 }}>
                       <Txt k="stat" color={colors.muted} style={{ width: 34 }}>{p.number ? `#${p.number}` : '—'}</Txt>
                       <Txt k="body" style={{ flex: 1 }}>{p.name}</Txt>
+                      <Txt k="body" color={colors.muted} style={{ fontSize: 11 }}>{gpMap.get(p.id) ?? 0} GP</Txt>
                       <Txt k="body" color={colors.muted}>›</Txt>
                     </Pressable>
                   ))}

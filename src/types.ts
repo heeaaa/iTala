@@ -56,7 +56,8 @@ export interface Game {
   finishedAt?: number;
   homeOnCourt?: string[]; // player ids currently on the floor (max 5)
   awayOnCourt?: string[];
-  period?: number;        // current live period (persists across screen navigation)
+  period?: number;
+  attendance?: string[]; // player ids present at this game (undefined = not recorded)        // current live period (persists across screen navigation)
 }
 
 export interface League {
@@ -68,6 +69,8 @@ export interface League {
   trackMisses?: boolean; // per-league: show 2PT✗/3PT✗/FT✗ in the live tracker (default true)
   trackTurnovers?: boolean; // per-league: show the TOV button in the live tracker (default true)
   isShared?: boolean; // recreational only: the community drop-in space any signed-in user can write to
+  isClosed?: boolean; // season officially complete — unlocks final awards (Mythical Five)
+  isArchived?: boolean; // hidden everywhere; Super Admins can view/unarchive
   teams: Team[];
   players: Player[]; // league-scoped player pool
   games: Game[];

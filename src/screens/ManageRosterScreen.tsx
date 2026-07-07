@@ -10,13 +10,14 @@ export default function ManageRosterScreen({ route, navigation }: ScreenProps<'M
   const { leagueId } = route.params;
   const { dispatch } = useStore();
   const league = useLeague(leagueId);
-  const { isOwner } = useAdmin();
+  const { canScore, isOwner } = useAdmin();
   const [teamName, setTeamName] = useState('');
   const [opponentOnly, setOpponentOnly] = useState(false);
   const [playerDraft, setPlayerDraft] = useState<Record<string, { name: string; num: string }>>({});
 
   if (!league) return <Screen><Txt k="body">League not found.</Txt></Screen>;
   const owner = isOwner(league);
+  const scorer = canScore(league);
 
   const addTeam = () => {
     if (!teamName.trim()) return;
@@ -43,7 +44,7 @@ export default function ManageRosterScreen({ route, navigation }: ScreenProps<'M
         <Txt k="h1">{league.name}</Txt>
         <Txt k="body" color={colors.muted} style={{ marginBottom: space(5) }}>{league.season}</Txt>
 
-        {owner && (<>
+        {scorer && (<>
         <Txt k="label" style={{ marginBottom: 8 }}>Add a team</Txt>
         <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
           <TextInput
@@ -60,11 +61,6 @@ export default function ManageRosterScreen({ route, navigation }: ScreenProps<'M
           <Txt k="body" color={colors.muted}>Track as opponent only (score, no player stats)</Txt>
         </Pressable>
         </>)}
-        {!owner && (
-          <Txt k="body" color={colors.muted} style={{ fontSize: 12 }}>
-            Scorekeepers can add and edit players. Adding or restructuring teams is for league owners.
-          </Txt>
-        )}
 
         <View style={{ height: space(5) }} />
 
@@ -74,7 +70,7 @@ export default function ManageRosterScreen({ route, navigation }: ScreenProps<'M
               <TeamBadge logo={team.logo} color={team.color} size={16} />
               <Txt k="h2" style={{ flex: 1 }}>{team.name}</Txt>
               {team.teamOnly ? <Pill label="opponent" color={colors.surfaceHi} textColor={colors.muted} /> : <Pill label={`${team.playerIds.length}`} />}
-              {owner && (
+              {scorer && (
                 <Pressable onPress={() => navigation.navigate('EditTeam', { leagueId, teamId: team.id })} hitSlop={8}
                   style={{ paddingHorizontal: 12, paddingVertical: 6, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.line }}>
                   <Txt k="body" style={{ fontSize: 13 }}>✎ Edit</Txt>

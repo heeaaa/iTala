@@ -17,10 +17,10 @@ import { AppState, GameEvent, League, Player, Team, Game } from '../types';
 
 /* ---------- Row shapes (snake_case columns ↔ camelCase types) -------------- */
 
-interface LeagueRow { id: string; name: string; season: string; kind: 'league' | 'recreational'; foul_out_limit: number | null; track_misses: boolean | null; track_turnovers: boolean | null; is_shared: boolean | null; created_at: number; }
+interface LeagueRow { id: string; name: string; season: string; kind: 'league' | 'recreational'; foul_out_limit: number | null; track_misses: boolean | null; track_turnovers: boolean | null; is_shared: boolean | null; is_closed: boolean | null; is_archived: boolean | null; created_at: number; }
 interface TeamRow   { id: string; league_id: string; name: string; color: string; logo: string | null; coach: string | null; team_only: boolean; player_ids: string[]; }
 interface PlayerRow { id: string; league_id: string; name: string; number: string | null; origin_player_id: string | null; }
-interface GameRow   { id: string; league_id: string; home_team_id: string; away_team_id: string; status: 'scheduled'|'live'|'final'; scheduled_at: number | null; location: string | null; finished_at: number | null; home_on_court: string[]; away_on_court: string[]; period: number | null; }
+interface GameRow   { id: string; league_id: string; home_team_id: string; away_team_id: string; status: 'scheduled'|'live'|'final'; scheduled_at: number | null; location: string | null; finished_at: number | null; home_on_court: string[]; away_on_court: string[]; period: number | null; attendance: string[] | null; }
 interface EventRow  { id: string; league_id: string; game_id: string; team_id: string; player_id: string | null; type: string; period: number; ts: number; note: string | null; }
 
 const leagueFromRow = (r: LeagueRow, teams: Team[], players: Player[], games: Game[], events: GameEvent[]): League => ({
@@ -31,6 +31,8 @@ const leagueFromRow = (r: LeagueRow, teams: Team[], players: Player[], games: Ga
   trackMisses: r.track_misses ?? undefined,
   trackTurnovers: r.track_turnovers ?? undefined,
   isShared: r.is_shared || undefined,
+  isClosed: r.is_closed || undefined,
+  isArchived: r.is_archived || undefined,
   createdAt: r.created_at, teams, players, games, events,
 });
 const teamFromRow = (r: TeamRow): Team => ({
@@ -44,6 +46,7 @@ const playerFromRow = (r: PlayerRow): Player => ({
 });
 const gameFromRow = (r: GameRow): Game => ({
   id: r.id, leagueId: r.league_id, homeTeamId: r.home_team_id, awayTeamId: r.away_team_id,
+  attendance: r.attendance ?? undefined,
   status: r.status,
   scheduledAt: r.scheduled_at ?? undefined,
   location: r.location ?? undefined,
@@ -190,14 +193,12 @@ export async function pushAction(sb: SupabaseClient, action: Action, state: AppS
         const l = state.leagues.find(x => x.id === action.leagueId);
         const p = l?.players[l.players.length - 1]; // just-added player is last
         if (!l || !p) return;
-        check('UPSERT_players', await sb.from('players').upsert({
-          id: p.id, league_id: l.id, name: p.name, number: p.number ?? null,
-        }));
-        // ADD_PLAYER also attached the player to a team — re-upsert that team for its updated playerIds.
-        const t = l.teams.find(x => x.id === action.teamId);
-        if (t) check('UPSERT_teams', await sb.from('teams').upsert({
-          id: t.id, league_id: l.id, name: t.name, color: t.color,
-          logo: t.logo ?? null, coach: t.coach ?? null, team_only: !!t.teamOnly, player_ids: t.playerIds,
+        // ONE transaction server-side (player insert + team player_ids update).
+        // Two separate writes let a realtime re-pull land in between, briefly
+        // hydrating a player no team claimed — the "vanishing new player" bug.
+        check('ADD_PLAYER', await sb.rpc('add_player', {
+          p_league_id: l.id, p_team_id: action.teamId,
+          p_player_id: p.id, p_name: p.name, p_number: p.number ?? null,
         }));
         break;
       }
@@ -239,6 +240,7 @@ export async function pushAction(sb: SupabaseClient, action: Action, state: AppS
 
       case 'SET_LINEUP':
       case 'SUBSTITUTE':
+      case 'SET_ATTENDANCE':
       case 'SET_GAME_STATUS':
       case 'SET_PERIOD': {
         const l = state.leagues.find(x => x.id === action.leagueId);
@@ -278,6 +280,8 @@ export async function pushAction(sb: SupabaseClient, action: Action, state: AppS
         const patch: Record<string, boolean> = {};
         if (action.trackMisses !== undefined) patch.track_misses = action.trackMisses;
         if (action.trackTurnovers !== undefined) patch.track_turnovers = action.trackTurnovers;
+        if (action.isClosed !== undefined) patch.is_closed = action.isClosed;
+        if (action.isArchived !== undefined) patch.is_archived = action.isArchived;
         if (Object.keys(patch).length === 0) break;
         check('SET_LEAGUE_SETTINGS', await sb.from('leagues').update(patch).eq('id', action.leagueId));
         break;
@@ -335,6 +339,7 @@ function gameToRow(g: Game) {
     home_on_court: g.homeOnCourt ?? [],
     away_on_court: g.awayOnCourt ?? [],
     period: g.period ?? 1,
+    attendance: g.attendance ?? null,
   };
 }
 

@@ -155,11 +155,16 @@ create table if not exists public.leagues (
 alter table public.leagues add column if not exists track_misses boolean;
 alter table public.leagues add column if not exists track_turnovers boolean;
 alter table public.leagues add column if not exists is_shared boolean not null default false;
+alter table public.leagues add column if not exists is_closed boolean not null default false;
+alter table public.leagues add column if not exists is_archived boolean not null default false;
 alter table public.teams   add column if not exists coach text;
 -- Dormant breadcrumb (read by nothing yet): set by league duplication so a
 -- future career-profile feature can link the same person across seasons.
 -- Deliberately NOT a foreign key — the source league may be deleted later.
 alter table public.players add column if not exists origin_player_id text;
+-- Post-game attendance: player ids present at the game (null = not recorded;
+-- the app then falls back to "played = present").
+alter table public.games add column if not exists attendance text[];
 
 create table if not exists public.teams (
   id           text primary key,
@@ -386,7 +391,7 @@ create policy "leagues_delete_owner" on public.leagues for delete
 
 drop policy if exists "teams_insert" on public.teams;
 create policy "teams_insert" on public.teams for insert
-  with check (public.is_owner(league_id) or (public.is_shared_rec(league_id) and public.is_authed_user()));
+  with check (public.can_score(league_id)); -- scorekeepers manage rosters; can_score covers shared rec too
 drop policy if exists "teams_update" on public.teams;
 create policy "teams_update" on public.teams for update
   using (public.can_score(league_id)) with check (public.can_score(league_id));
@@ -564,6 +569,24 @@ grant execute on function public.regenerate_league_code(text,text) to authentica
 grant execute on function public.list_members(text) to authenticated;
 grant execute on function public.remove_member(text,uuid) to authenticated;
 grant execute on function public.my_memberships() to authenticated;
+
+-- Adds a player AND attaches them to their team in ONE transaction. The app
+-- previously did this as two writes; a realtime re-pull landing between them
+-- hydrated a player that no team claimed yet, making the new roster row
+-- vanish for a beat. One transaction = every snapshot is consistent.
+create or replace function public.add_player(
+  p_league_id text, p_team_id text, p_player_id text, p_name text, p_number text
+) returns void language plpgsql security definer set search_path = public as $$
+begin
+  if not public.can_score(p_league_id) then raise exception 'Scorekeeper access required.'; end if;
+  insert into public.players (id, league_id, name, number)
+  values (p_player_id, p_league_id, p_name, p_number)
+  on conflict (id) do update set name = excluded.name, number = excluded.number;
+  update public.teams
+     set player_ids = array_append(array_remove(player_ids, p_player_id), p_player_id)
+   where id = p_team_id and league_id = p_league_id;
+end $$;
+grant execute on function public.add_player(text,text,text,text,text) to authenticated;
 
 -- =============================================================================
 -- 5) ADMIN ELEVATION — password verified server-side, never sent to the client

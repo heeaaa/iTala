@@ -3,6 +3,7 @@ import { View, ScrollView, Pressable, TextInput, Alert, Image } from 'react-nati
 import * as ImagePicker from 'expo-image-picker';
 import { Screen, Txt, Card, Button, Field, TeamBadge } from '../components/ui';
 import { useStore, useLeague } from '../store/StoreProvider';
+import { useAdmin } from '../store/AdminProvider';
 import { colors, space, radius, font, teamColors } from '../theme';
 import { ScreenProps } from '../navigation';
 import { Player } from '../types';
@@ -38,6 +39,7 @@ export default function EditTeamScreen({ route, navigation }: ScreenProps<'EditT
   const { leagueId, teamId } = route.params;
   const { dispatch } = useStore();
   const league = useLeague(leagueId);
+  const { isOwner } = useAdmin();
   const team = league?.teams.find(t => t.id === teamId);
 
   const [name, setName] = useState(team?.name ?? '');
@@ -216,7 +218,11 @@ export default function EditTeamScreen({ route, navigation }: ScreenProps<'EditT
         )}
 
         <View style={{ height: space(6) }} />
-        <Button title="Delete team" kind="danger" onPress={deleteTeam} />
+        {league && isOwner(league) ? (
+          <Button title="Delete team" kind="danger" onPress={deleteTeam} />
+        ) : (
+          <Txt k="body" color={colors.muted} style={{ fontSize: 12 }}>Deleting a team is reserved for league owners.</Txt>
+        )}
       </ScrollView>
     </Screen>
   );

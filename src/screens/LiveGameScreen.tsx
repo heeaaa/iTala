@@ -7,7 +7,7 @@ import { ScreenProps } from '../navigation';
 import { EventType, Team, Player } from '../types';
 import {
   gameScore, teamBoxScore, teamPeriodFouls, fouledOutSet, playerFouls, effectiveFoulLimit,
-  lineScore, perfRating,
+  lineScore, perfRating, teamPeriodTimeouts,
 } from '../lib/stats';
 
 type PadBtn = { label: string; type: EventType; color: string };
@@ -175,6 +175,7 @@ export default function LiveGameScreen({ route, navigation }: ScreenProps<'LiveG
           <SideScore
             team={sideTeam(leftSide)} score={sideScore(leftSide)} active={activeSide === leftSide}
             teamFouls={teamPeriodFouls(league, gameId, sideTeam(leftSide).id, period)}
+            timeouts={teamPeriodTimeouts(league, gameId, sideTeam(leftSide).id, period)}
             onPress={() => setActiveSide(leftSide)} />
           <View style={{ alignItems: 'center', paddingHorizontal: 6 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
@@ -197,6 +198,7 @@ export default function LiveGameScreen({ route, navigation }: ScreenProps<'LiveG
           <SideScore
             team={sideTeam(rightSide)} score={sideScore(rightSide)} active={activeSide === rightSide} right
             teamFouls={teamPeriodFouls(league, gameId, sideTeam(rightSide).id, period)}
+            timeouts={teamPeriodTimeouts(league, gameId, sideTeam(rightSide).id, period)}
             onPress={() => setActiveSide(rightSide)} />
         </View>
 
@@ -373,11 +375,12 @@ function MiniBtn({ label, onPress, disabled }: { label: string; onPress: () => v
   );
 }
 
-function SideScore({ team, score, active, onPress, right, teamFouls }:
-  { team: Team; score: number; active: boolean; onPress: () => void; right?: boolean; teamFouls: number }) {
+function SideScore({ team, score, active, onPress, right, teamFouls, timeouts }:
+  { team: Team; score: number; active: boolean; onPress: () => void; right?: boolean; teamFouls: number; timeouts: number }) {
   return (
     <Pressable onPress={onPress} style={{ flex: 1, alignItems: right ? 'flex-end' : 'flex-start' }}>
       <Txt k="label" color={colors.muted} style={{ fontSize: 10 }}>Team Fouls: {teamFouls}</Txt>
+      <Txt k="label" color={colors.muted} style={{ fontSize: 10 }}>Timeouts: {timeouts}</Txt>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
         {!right && <TeamBadge logo={team.logo} color={team.color} size={18} />}
         <Txt k="h2" numberOfLines={1} color={active ? colors.text : colors.muted}>{team.name}</Txt>

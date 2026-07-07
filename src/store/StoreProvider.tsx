@@ -24,9 +24,10 @@ export type Action =
   | { t: 'DELETE_EVENT'; leagueId: string; eventId: string }
   | { t: 'DELETE_GAME'; leagueId: string; gameId: string }
   | { t: 'SET_GAME_STATUS'; leagueId: string; gameId: string; status: Game['status'] }
+  | { t: 'SET_ATTENDANCE'; leagueId: string; gameId: string; playerIds: string[] }
   | { t: 'SET_PERIOD'; leagueId: string; gameId: string; period: number }
   | { t: 'DUPLICATE_LEAGUE'; sourceLeagueId: string; newLeagueId: string; name: string; season: string }
-  | { t: 'SET_LEAGUE_SETTINGS'; leagueId: string; trackMisses?: boolean; trackTurnovers?: boolean }
+  | { t: 'SET_LEAGUE_SETTINGS'; leagueId: string; trackMisses?: boolean; trackTurnovers?: boolean; isClosed?: boolean; isArchived?: boolean }
   | { t: 'SET_SETTINGS'; settings: Partial<AppState['settings']> }
   | { t: 'REC_SETUP_GAME'; leagueId: string; gameId: string; location?: string; teams: [{ name: string; players: { name: string; number?: string }[] }, { name: string; players: { name: string; number?: string }[] }] };
 
@@ -228,6 +229,12 @@ function reducer(state: AppState, a: Action): AppState {
         events: l.events.filter(e => e.gameId !== a.gameId), // drop all stats logged for that game
       }));
 
+    case 'SET_ATTENDANCE':
+      return mapLeague(state, a.leagueId, l => ({
+        ...l,
+        games: l.games.map(g => g.id === a.gameId ? { ...g, attendance: a.playerIds } : g),
+      }));
+
     case 'SET_GAME_STATUS':
       return mapLeague(state, a.leagueId, l => ({
         ...l,
@@ -283,6 +290,8 @@ function reducer(state: AppState, a: Action): AppState {
         ...l,
         ...(a.trackMisses !== undefined ? { trackMisses: a.trackMisses } : {}),
         ...(a.trackTurnovers !== undefined ? { trackTurnovers: a.trackTurnovers } : {}),
+        ...(a.isClosed !== undefined ? { isClosed: a.isClosed } : {}),
+        ...(a.isArchived !== undefined ? { isArchived: a.isArchived } : {}),
       }));
 
     case 'SET_SETTINGS':

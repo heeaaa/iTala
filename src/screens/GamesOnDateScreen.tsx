@@ -11,11 +11,12 @@ import { dayKey, dayLabel, dateTimeLabel } from '../lib/format';
 export default function GamesOnDateScreen({ route, navigation }: ScreenProps<'GamesOnDate'>) {
   const { leagueId, dayKey: key, teamId } = route.params;
   const { dispatch } = useStore();
-  const { canScore } = useAdmin();
+  const { canScore, isOwner } = useAdmin();
   const league = useLeague(leagueId);
 
   if (!league) return <Screen><Txt k="body">League not found.</Txt></Screen>;
   const scorer = canScore(league);
+  const owner = isOwner(league); // deleting games is destructive — owners only
 
   const teamName = (id: string) => league.teams.find(t => t.id === id)?.name ?? '?';
   const teamColor = (id: string) => league.teams.find(t => t.id === id)?.color ?? colors.muted;
@@ -95,7 +96,7 @@ export default function GamesOnDateScreen({ route, navigation }: ScreenProps<'Ga
             </Card>
           );
           // Only admins can delete (swipe). Spectators get a plain, non-swipeable card.
-          return scorer ? (
+          return owner ? (
             <SwipeableRow key={g.id} onDelete={() => confirmDelete(g.id, label)}>{card}</SwipeableRow>
           ) : (
             <View key={g.id} style={{ marginBottom: space(3) }}>{card}</View>
