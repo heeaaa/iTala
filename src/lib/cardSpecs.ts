@@ -49,13 +49,19 @@ export function gameCardOptions(league: League, gameId: string, playerId: string
     contextLine,
   };
 
-  const statList = [
+  // Fixed order (matches the in-app Career High section): PTS · REB · AST · STL · BLK.
+  // Every game card uses this same ordered set — PTS is the hero, the rest are
+  // chips — so stats are never duplicated or out of order.
+  const orderedStats = [
     { label: 'PTS', value: `${line.pts}` },
     { label: 'REB', value: `${line.reb}` },
     { label: 'AST', value: `${line.ast}` },
     { label: 'STL', value: `${line.stl}` },
     { label: 'BLK', value: `${line.blk}` },
   ];
+  // hero PTS + the next four in order (chips). Never repeats the hero.
+  const heroLine = (heroLabel = 'PTS') =>
+    [{ label: heroLabel, value: `${line.pts}` }, ...orderedStats.slice(1)];
 
   const opts: GameCardOption[] = [];
 
@@ -64,12 +70,12 @@ export function gameCardOptions(league: League, gameId: string, playerId: string
   if (doubles >= 3) {
     opts.push({ key: 'triple', label: 'Triple-Double', build: () => ({
       kicker: 'Triple-Double', badge: '🔥', accent: colors.brandLime, mvp: false,
-      ...base, stats: statList.filter(s => Number(s.value) >= 10).concat(statList).slice(0, 4),
+      ...base, stats: heroLine(),
     }) });
   } else if (doubles >= 2) {
     opts.push({ key: 'double', label: 'Double-Double', build: () => ({
       kicker: 'Double-Double', badge: '🔥', accent: colors.brandLime,
-      ...base, stats: statList.filter(s => Number(s.value) >= 10).concat(statList).slice(0, 4),
+      ...base, stats: heroLine(),
     }) });
   }
 
@@ -77,7 +83,7 @@ export function gameCardOptions(league: League, gameId: string, playerId: string
   if (line.pts >= 25) {
     opts.push({ key: 'pts25', label: `${line.pts}-Point Game`, build: () => ({
       kicker: `${line.pts}-Point Game`, badge: '🎯', accent: colors.brandTeal,
-      ...base, stats: [{ label: 'Points', value: `${line.pts}` }, ...statList.slice(1, 4)],
+      ...base, stats: heroLine('Points'),
     }) });
   }
 
@@ -86,7 +92,7 @@ export function gameCardOptions(league: League, gameId: string, playerId: string
   if (line.pts > 0 && line.pts >= c.highPts) {
     opts.push({ key: 'careerHigh', label: 'Career High', build: () => ({
       kicker: 'Career High', badge: '⭐', accent: colors.brandLimeBright,
-      ...base, stats: [{ label: 'Career-High Points', value: `${line.pts}` }, ...statList.slice(1, 4)],
+      ...base, stats: heroLine('Career-High Points'),
     }) });
   }
 
@@ -99,7 +105,7 @@ export function gameCardOptions(league: League, gameId: string, playerId: string
     if (best && best.playerId === playerId) {
       opts.push({ key: 'potg', label: 'Player of the Game', build: () => ({
         kicker: 'Player of the Game', badge: '🏅', accent: colors.brandTeal, mvp: true,
-        ...base, stats: [{ label: 'PTS', value: `${line.pts}` }, ...statList.slice(1, 4)],
+        ...base, stats: heroLine(),
       }) });
     }
   }
@@ -107,7 +113,7 @@ export function gameCardOptions(league: League, gameId: string, playerId: string
   // Always offer a plain "game line" card as a fallback.
   opts.push({ key: 'line', label: 'Game Stat Line', build: () => ({
     kicker: 'Game Stat Line', accent: colors.brandTeal,
-    ...base, stats: [{ label: 'PTS', value: `${line.pts}` }, ...statList.slice(1, 4)],
+    ...base, stats: heroLine(),
   }) });
 
   return opts;

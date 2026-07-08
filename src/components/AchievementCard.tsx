@@ -59,9 +59,11 @@ export const AchievementCard = React.forwardRef<View, { spec: CardSpec; layout: 
     const rest = spec.stats.slice(1);
 
     // Scale a few spacings between the taller story and compact feed layouts.
+    // Feed (540×540) is vertically tight, so its hero and margins are smaller to
+    // guarantee the content column clears the bottom-pinned footer.
     const padX = isStory ? 44 : 36;
-    const nameSize = isStory ? 52 : 40;
-    const primarySize = isStory ? 108 : 84;
+    const nameSize = isStory ? 52 : 34;
+    const primarySize = isStory ? 108 : 64;
 
     return (
       <View ref={ref} collapsable={false}
@@ -97,7 +99,7 @@ export const AchievementCard = React.forwardRef<View, { spec: CardSpec; layout: 
         </View>
 
         {/* KICKER + BADGE */}
-        <View style={{ paddingHorizontal: padX, marginTop: isStory ? 40 : 20 }}>
+        <View style={{ paddingHorizontal: padX, marginTop: isStory ? 40 : 14 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             {spec.badge ? <Text style={{ fontSize: isStory ? 40 : 30 }}>{spec.badge}</Text> : null}
             <Text style={{ fontFamily: font.display, fontSize: isStory ? 24 : 18, lineHeight: isStory ? 32 : 24, color: accent, letterSpacing: 2, includeFontPadding: true } as any}>
@@ -110,7 +112,7 @@ export const AchievementCard = React.forwardRef<View, { spec: CardSpec; layout: 
         </View>
 
         {/* PLAYER */}
-        <View style={{ paddingHorizontal: padX, marginTop: isStory ? 34 : 18 }}>
+        <View style={{ paddingHorizontal: padX, marginTop: isStory ? 34 : 12 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 14 }}>
             {spec.teamLogo || spec.teamColor ? (
               <TeamBadge logo={spec.teamLogo} color={spec.teamColor ?? colors.muted} size={isStory ? 40 : 32} />
@@ -130,7 +132,7 @@ export const AchievementCard = React.forwardRef<View, { spec: CardSpec; layout: 
 
         {/* PRIMARY STAT — hero number */}
         {primary ? (
-          <View style={{ paddingHorizontal: padX, marginTop: isStory ? 40 : 20 }}>
+          <View style={{ paddingHorizontal: padX, marginTop: isStory ? 40 : 14 }}>
             <Text style={{ fontFamily: font.display, fontSize: primarySize, lineHeight: primarySize * 1.28, color: accent, includeFontPadding: true, paddingTop: primarySize * 0.06 } as any}>
               {primary.value}
             </Text>
@@ -140,11 +142,11 @@ export const AchievementCard = React.forwardRef<View, { spec: CardSpec; layout: 
           </View>
         ) : null}
 
-        {/* SECONDARY STATS ROW */}
-        {rest.length > 0 ? (
-          <View style={{ flexDirection: 'row', paddingHorizontal: padX, marginTop: isStory ? 34 : 18, gap: 10, flexWrap: 'wrap' }}>
-            {rest.map((s, i) => (
-              <View key={i} style={{ flex: 1, minWidth: 80, backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1, borderColor: colors.line, paddingVertical: isStory ? 16 : 12, alignItems: 'center' }}>
+        {/* SECONDARY STATS ROW — skip zero-value chips to avoid clutter */}
+        {rest.filter(s => s.value !== '0').length > 0 ? (
+          <View style={{ flexDirection: 'row', paddingHorizontal: padX, marginTop: isStory ? 34 : 14, gap: 10, flexWrap: 'wrap' }}>
+            {rest.filter(s => s.value !== '0').map((s, i) => (
+              <View key={i} style={{ flex: 1, minWidth: 72, backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1, borderColor: colors.line, paddingVertical: isStory ? 16 : 12, alignItems: 'center' }}>
                 <Text style={{ fontFamily: font.display, fontSize: isStory ? 34 : 26, lineHeight: isStory ? 46 : 36, color: colors.text, includeFontPadding: true } as any}>{s.value}</Text>
                 <Text style={{ fontFamily: font.body, fontSize: isStory ? 12 : 10, color: colors.muted, letterSpacing: 1, marginTop: 2 }}>{s.label.toUpperCase()}</Text>
               </View>
@@ -152,19 +154,28 @@ export const AchievementCard = React.forwardRef<View, { spec: CardSpec; layout: 
           </View>
         ) : null}
 
-        {/* CONTEXT LINE (matchup/score/date) */}
-        {spec.contextLine ? (
-          <View style={{ paddingHorizontal: padX, marginTop: isStory ? 28 : 16 }}>
-            <Text style={{ fontFamily: font.body, fontSize: isStory ? 15 : 12, color: colors.muted }}>
+        {/* CONTEXT + FOOTER — pinned together at the bottom so they never
+            collide with each other or with the stats above (the old bug was
+            the context line flowing down into the absolute footer). */}
+        <View style={{ position: 'absolute', left: padX, right: padX, bottom: isStory ? 36 : 22 }}>
+          {spec.contextLine ? (
+            <Text style={{ fontFamily: font.body, fontSize: isStory ? 14 : 11, color: colors.muted, marginBottom: isStory ? 18 : 12 }}>
               {spec.contextLine}
             </Text>
+          ) : null}
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }}>
+            <View>
+              <LinearGradient
+                colors={wordmarkGradient}
+                start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                style={{ height: 2, width: 64, borderRadius: 1, marginBottom: 8 }}
+              />
+              <Text style={{ fontFamily: font.body, fontSize: isStory ? 11 : 10, color: colors.muted, letterSpacing: 1.2 }}>
+                RECORD · TRACK · ELEVATE
+              </Text>
+            </View>
+            <SponsorMark />
           </View>
-        ) : null}
-
-        {/* FOOTER — sponsor + tag, pinned to the bottom */}
-        <View style={{ position: 'absolute', left: padX, right: padX, bottom: isStory ? 40 : 24, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <SponsorMark />
-          <Text style={{ fontFamily: font.body, fontSize: isStory ? 12 : 10, color: colors.muted }}>tracked with iTala</Text>
         </View>
       </View>
     );
