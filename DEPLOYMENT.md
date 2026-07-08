@@ -152,6 +152,13 @@ already defines `development`, `preview`, and `production` build profiles.
 
 ## 2. Test on real devices first (do not skip)
 
+``` bash
+# If you have a zip file of the workspace, unzip and merge automatically using these
+Expand-Archive -Path iTala-project.zip -DestinationPath itala-incoming -Force
+robocopy itala-incoming\iTala iTala /MIR /XD .git node_modules
+cd iTala
+```
+
 A simulator hides real-device issues (fonts, share sheet, storage). Build an internal-distribution
 binary and install it on your phone:
 

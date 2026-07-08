@@ -63,7 +63,15 @@ export default function LeaguesScreen({ navigation }: ScreenProps<'Leagues'>) {
     .sort((a, b) => (favSet.has(b.id) ? 1 : 0) - (favSet.has(a.id) ? 1 : 0))
     .flatMap(l =>
       l.games.filter(g => g.status === 'live')
-        .map(g => ({ leagueId: l.id, gameId: g.id, leagueName: l.name, league: l }))
+        .map(g => {
+          const home = l.teams.find(t => t.id === g.homeTeamId);
+          const away = l.teams.find(t => t.id === g.awayTeamId);
+          return {
+            leagueId: l.id, gameId: g.id, leagueName: l.name, league: l,
+            matchup: home && away ? `${home.name} vs ${away.name}` : null,
+            location: g.location ?? null,
+          };
+        })
     );
 
   // Search + favorites. Favorites float to the top (stable within groups so
@@ -217,6 +225,12 @@ Share this with the organizer. It can create exactly one league, then expires.`)
                   <Txt k="label" color={colors.brandLime}>Live now</Txt>
                 </View>
                 <Txt k="h2" color={colors.text} numberOfLines={1}>{ref.leagueName}</Txt>
+                {ref.matchup ? (
+                  <Txt k="body" color={colors.muted} numberOfLines={1} style={{ fontSize: 13, marginTop: 1 }}>{ref.matchup}</Txt>
+                ) : null}
+                {ref.location ? (
+                  <Txt k="body" color={colors.muted} numberOfLines={1} style={{ fontSize: 11, marginTop: 2 }}>📍 {ref.location}</Txt>
+                ) : null}
               </View>
               <Txt k="h1" color={colors.brandTeal}>▶</Txt>
             </Pressable>
