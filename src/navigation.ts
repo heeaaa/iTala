@@ -14,6 +14,8 @@ export type RootStackParams = {
   SelectLineup: { leagueId: string; gameId: string };
   LiveGame: { leagueId: string; gameId: string; spectator?: boolean };
   BoxScore: { leagueId: string; gameId: string };
+  FinalScore: { leagueId: string; gameId: string };
+  SeasonRecap: { leagueId: string };
   PlayerProfile: { leagueId: string; playerId: string };
 };
 

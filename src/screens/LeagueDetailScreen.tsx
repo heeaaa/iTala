@@ -23,6 +23,13 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
 
   const scorer = canScore(league);  // owner, co-owner, scorekeeper, super, or shared rec
   const owner = isOwner(league);    // owner / co-owner / super
+  const isRec = league.kind === 'recreational'; // drop-in space, not a league
+  const seasonOver = !isRec && !!league.isClosed; // completed league season
+  // Tab labels differ (rec has no Standings/Leaders), so map the numeric tab
+  // index to a stable NAME and switch on that — keeps the four league blocks
+  // and two rec blocks working without renumbering.
+  const tabNames = isRec ? ['Games', 'Roster'] : ['Standings', 'Leaders', 'Games', 'Roster'];
+  const activeTab = tabNames[tab] ?? tabNames[0];
 
   // Favorite teams float to the top of the roster and the games filter chips;
   // within each group the order is alphabetical so it never shifts under the
@@ -40,7 +47,9 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
         <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
           <View style={{ flex: 1 }}>
             <Txt k="h1">{league.name}</Txt>
-            <Txt k="body" color={colors.muted}>{league.season}</Txt>
+            <Txt k="body" color={colors.muted}>
+              {isRec ? (league.isShared ? 'Public drop-in games' : 'Your private drop-in games') : league.season}
+            </Txt>
           </View>
           {owner && (
             <Pressable onPress={() => setShowSettings(v => !v)} hitSlop={10}
@@ -70,9 +79,15 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
             </Pressable>
           );
         })}
+        {!showSettings && seasonOver && (
+          <View style={{ marginTop: space(3), backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Txt k="h2">🏆</Txt>
+            <Txt k="body" color={colors.muted} style={{ flex: 1, fontSize: 13 }}>Season complete — final standings and awards below. No new games can be started.</Txt>
+          </View>
+        )}
         {!showSettings && (
           <View style={{ marginTop: space(3) }}>
-            <Segmented options={['Standings', 'Leaders', 'Games', 'Roster']} value={tab} onChange={setTab} />
+            <Segmented options={isRec ? ['Games', 'Roster'] : ['Standings', 'Leaders', 'Games', 'Roster']} value={tab} onChange={setTab} />
           </View>
         )}
       </View>
@@ -82,20 +97,21 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
             duplicate, archive) is always reachable. */}
         {owner && showSettings && (
           <Card style={{ marginTop: space(3) }}>
-            <Txt k="label" style={{ marginBottom: space(2) }}>League settings</Txt>
+            <Txt k="label" style={{ marginBottom: space(2) }}>{isRec ? 'Drop-in settings' : 'League settings'}</Txt>
             <Toggle
               label="Track missed shots"
-              description="Show the 2PT ✗, 3PT ✗, and FT ✗ buttons in this league's live tracker. Applies to this league only; makes and all other stats are always tracked."
+              description={`Show the 2PT ✗, 3PT ✗, and FT ✗ buttons in the live tracker for ${isRec ? 'these drop-in games' : 'this league'}. Makes and all other stats are always tracked.`}
               value={league.trackMisses ?? true}
               onChange={(v) => dispatch({ t: 'SET_LEAGUE_SETTINGS', leagueId, trackMisses: v })}
             />
             <View style={{ height: space(3) }} />
             <Toggle
               label="Track turnovers"
-              description="Show the TOV button in this league's live tracker and the TO column in box scores. Applies to this league only."
+              description={`Show the TOV button in the live tracker and the TO column in box scores for ${isRec ? 'these drop-in games' : 'this league'}.`}
               value={league.trackTurnovers ?? true}
               onChange={(v) => dispatch({ t: 'SET_LEAGUE_SETTINGS', leagueId, trackTurnovers: v })}
             />
+            {!isRec && (<>
             <View style={{ height: space(3) }} />
             <Toggle
               label="Season complete"
@@ -103,9 +119,10 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
               value={league.isClosed ?? false}
               onChange={(v) => dispatch({ t: 'SET_LEAGUE_SETTINGS', leagueId, isClosed: v })}
             />
+            </>)}
 
             {/* Archive — Super Admins only. Hides the league everywhere; reversible. */}
-            {isAdmin && !league.isShared && (
+            {isAdmin && !league.isShared && !isRec && (
               <View style={{ marginTop: space(3) }}>
                 <Button
                   title={league.isArchived ? '📤 Unarchive league' : '🗄 Archive league'}
@@ -158,7 +175,7 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
             )}
 
             {/* Duplicate league — new season, same teams/players/settings, zero games */}
-            {!league.isShared && (
+            {!league.isShared && !isRec && (
               <View style={{ marginTop: space(4), borderTopWidth: 1, borderTopColor: colors.line, paddingTop: space(3) }}>
                 <Txt k="label" style={{ marginBottom: 4 }}>New season</Txt>
                 {dupOpen ? (
@@ -184,7 +201,7 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
                 )}
               </View>
             )}
-            {!league.isShared && (
+            {!league.isShared && !isRec && (
               <MembersSection
                 leagueId={leagueId}
                 leagueName={league.name}
@@ -198,7 +215,7 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
           </Card>
         )}
 
-        {!showSettings && tab === 2 && (
+        {!showSettings && activeTab === 'Games' && (
           league.games.length === 0
             ? <Empty title="No games yet" subtitle="Tap Start Game to keep stats live." />
             : (() => {
@@ -263,7 +280,7 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
               })()
         )}
 
-        {!showSettings && tab === 0 && (
+        {!showSettings && activeTab === 'Standings' && (
           <Card style={{ padding: space(2) }}>
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               <View>
@@ -300,7 +317,7 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
           </Card>
         )}
 
-        {!showSettings && tab === 1 && (
+        {!showSettings && activeTab === 'Leaders' && (
           (() => {
             const rows = leaderboards(league);
             if (rows.length === 0) return <Empty title="No stats yet" subtitle="Play a game to populate the leaderboard." />;
@@ -353,6 +370,13 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
                 })}
 
                 {/* 🏆 AWARDS — computed live; appear after 6 games; official at season close */}
+                {league.isClosed && finalsCount >= 6 && (
+                  <Button
+                    title="🎉 View & share Season Recap"
+                    onPress={() => navigation.navigate('SeasonRecap', { leagueId })}
+                    style={{ marginBottom: space(3) }}
+                  />
+                )}
                 {finalsCount >= 6 && (
                 <Card style={{ marginBottom: space(3), borderColor: colors.brandTeal }}>
                   <Txt k="label" color={colors.brandTeal}>🏆 League awards</Txt>
@@ -390,7 +414,7 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
           })()
         )}
 
-        {!showSettings && tab === 3 && (
+        {!showSettings && activeTab === 'Roster' && (
           <>
             <TextInput
               value={rosterQuery} onChangeText={setRosterQuery}
@@ -457,7 +481,7 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
         )}
       </ScrollView>
 
-      {scorer && !showSettings && (
+      {scorer && !showSettings && !isRec && !seasonOver && (
         <View style={{
           position: 'absolute', left: 0, right: 0, bottom: 0,
           paddingHorizontal: space(4), paddingTop: space(3), paddingBottom: space(6),

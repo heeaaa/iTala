@@ -1,4 +1,5 @@
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState, useEffect, useCallback } from 'react';
+import { useKeepAwake } from 'expo-keep-awake';
 import { View, Pressable, ScrollView, Alert, Modal, TextInput } from 'react-native';
 import { Screen, Txt, Button, Segmented, TeamBadge, LivePip } from '../components/ui';
 import { useStore, useLeague } from '../store/StoreProvider';
@@ -7,8 +8,9 @@ import { ScreenProps } from '../navigation';
 import { EventType, Team, Player } from '../types';
 import {
   gameScore, teamBoxScore, teamPeriodFouls, fouledOutSet, playerFouls, effectiveFoulLimit,
-  lineScore, perfRating, teamPeriodTimeouts,
+  lineScore, perfRating, teamPeriodTimeouts, careerStats,
 } from '../lib/stats';
+import { tapFeedback, undoFeedback, successFeedback } from '../lib/haptics';
 
 type PadBtn = { label: string; type: EventType; color: string };
 const MISS_ROW: PadBtn[] = [
@@ -48,6 +50,14 @@ export default function LiveGameScreen({ route, navigation }: ScreenProps<'LiveG
   const [logOpen, setLogOpen] = useState(false);
   const [timeoutOpen, setTimeoutOpen] = useState(false);
   const [flash, setFlash] = useState<string | null>(null); // brief "logged" confirmation
+  const [milestone, setMilestone] = useState<string | null>(null); // celebratory banner
+  useKeepAwake(); // screen never sleeps mid-game
+  const leagueRef = React.useRef(league);
+  leagueRef.current = league;
+
+  // Guard against an accidental back-swipe dumping the scorekeeper out of a
+  // live game. The game state is safe either way, but the interruption is
+  // jarring mid-action, so we confirm first. Spectators aren't guarded.
 
   const score = useMemo(() => (league && game ? gameScore(league, game) : { home: 0, away: 0 }), [state, leagueId, gameId]);
 
@@ -72,7 +82,95 @@ export default function LiveGameScreen({ route, navigation }: ScreenProps<'LiveG
     if (!trackTurnovers && armed === 'tov') setArmed(null);
   }, [trackMisses, trackTurnovers, armed]);
 
-  if (!league || !game) return <Screen><Txt k="body">Game not found.</Txt></Screen>;
+  const guardEnabled = !readOnly;
+  useEffect(() => {
+    if (!guardEnabled) return;
+    const unsub = navigation.addListener('beforeRemove', (e: any) => {
+      // Only guard while the game is still live.
+      const g = leagueRef.current?.games.find(x => x.id === gameId);
+      if (!g || g.status !== 'live') return;
+      e.preventDefault();
+      Alert.alert(
+        'Leave live tracking?',
+        'The game stays saved — you can come back to it anytime from the league. Leave now?',
+        [
+          { text: 'Stay', style: 'cancel' },
+          { text: 'Leave', style: 'destructive', onPress: () => navigation.dispatch(e.data.action) },
+        ],
+      );
+    });
+    return unsub;
+  }, [navigation, guardEnabled, gameId]);
+
+  const celebratedRef = React.useRef<Set<string>>(new Set());
+  const milestoneQueue = React.useRef<string[]>([]);
+  const bannerBusy = React.useRef(false);
+  // Drain the queue one banner at a time so two milestones landing together
+  // (e.g. a bucket that's both a career high AND completes a double-double)
+  // are each shown for their full moment instead of one clobbering the other.
+  const showNextMilestone = React.useCallback(() => {
+    if (bannerBusy.current) return;
+    const next = milestoneQueue.current.shift();
+    if (!next) return;
+    bannerBusy.current = true;
+    successFeedback();
+    setMilestone(next);
+    setTimeout(() => {
+      setMilestone(null);
+      bannerBusy.current = false;
+      setTimeout(showNextMilestone, 350); // brief gap, then next if any
+    }, 3800);
+  }, []);
+
+  useEffect(() => {
+    if (!league || !game || game.status !== 'live') return;
+    const enqueue = (key: string, text: string) => {
+      if (celebratedRef.current.has(key)) return;
+      celebratedRef.current.add(key);
+      milestoneQueue.current.push(text);
+      showNextMilestone();
+    };
+    for (const teamId of [game.homeTeamId, game.awayTeamId]) {
+      const box = teamBoxScore(league, gameId, teamId);
+      for (const l of box.lines) {
+        if (!l.playerId) continue;
+        const nm = league.players.find(p => p.id === l.playerId)?.name ?? 'Player';
+
+        // Career-high points
+        if (l.pts > 0) {
+          const priorHigh = careerStats(league, l.playerId).highPts;
+          if (priorHigh > 0 && l.pts >= priorHigh) {
+            enqueue(`hi:${l.playerId}:${l.pts}`, `🎉 Career high — ${nm}, ${l.pts} PTS!`);
+          }
+        }
+
+        // Double-double: 10+ in any two of PTS / REB / AST / STL / BLK.
+        // Keyed per-player-per-game so it fires once, the moment it completes.
+        const cats: [string, number][] = [['PTS', l.pts], ['REB', l.reb], ['AST', l.ast], ['STL', l.stl], ['BLK', l.blk]];
+        const doubles = cats.filter(([, v]) => v >= 10);
+        if (doubles.length >= 2) {
+          const label = doubles.length >= 3 ? 'Triple-double' : 'Double-double';
+          enqueue(`dd:${l.playerId}`, `🔥 ${label} — ${nm}! ${doubles.slice(0, 3).map(([c, v]) => `${v} ${c}`).join(' · ')}`);
+        }
+      }
+    }
+  }, [state, gameId]); // eslint-disable-line
+
+  const [waitedForGame, setWaitedForGame] = useState(false);
+  useEffect(() => {
+    if (game) return;
+    const t = setTimeout(() => setWaitedForGame(true), 1500);
+    return () => clearTimeout(t);
+  }, [game]);
+  if (!league || !game) {
+    return (
+      <Screen>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: space(6) }}>
+          <Txt k="body" color={colors.muted}>{waitedForGame ? 'Game not found.' : 'Loading game…'}</Txt>
+        </View>
+      </Screen>
+    );
+  }
 
   // FIBA: foul out on the 5th personal foul (legacy leagues stored 6 — capped to 5).
   const foulLimit = effectiveFoulLimit(league);
@@ -92,6 +190,8 @@ export default function LiveGameScreen({ route, navigation }: ScreenProps<'LiveG
   const lastEvent = events[events.length - 1];
 
   const nameOf = (id: string | null) => id ? (league.players.find(p => p.id === id)?.name ?? 'Player') : activeTeam.name;
+  const homeBoxNow = () => teamBoxScore(league, gameId, game.homeTeamId);
+  const awayBoxNow = () => teamBoxScore(league, gameId, game.awayTeamId);
 
   const log = (playerId: string | null) => {
     if (!armed) return;
@@ -108,6 +208,9 @@ export default function LiveGameScreen({ route, navigation }: ScreenProps<'LiveG
     }
     dispatch({ t: 'ADD_EVENT', leagueId, gameId, teamId: activeTeam.id, playerId, type: armed, period });
 
+    // Physical confirmation for the scorekeeper who isn't looking at the screen.
+    tapFeedback();
+
     // ALWAYS clear the armed stat after logging, and show a brief confirmation.
     setArmed(null);
     setFlash(`✓ ${verb} — ${who}`);
@@ -117,6 +220,7 @@ export default function LiveGameScreen({ route, navigation }: ScreenProps<'LiveG
   const logTimeout = (timeRemaining: string) => {
     const tr = timeRemaining.trim();
     dispatch({ t: 'ADD_EVENT', leagueId, gameId, teamId: activeTeam.id, playerId: null, type: 'timeout', period, note: tr || undefined });
+    tapFeedback();
     setTimeoutOpen(false);
     setArmed(null);
     setFlash(`✓ Timeout — ${activeTeam.name}${tr ? ` (${tr} left)` : ''}`);
@@ -124,8 +228,8 @@ export default function LiveGameScreen({ route, navigation }: ScreenProps<'LiveG
 
   const arm = (type: EventType | null) => { setFlash(null); setArmed(type); };
 
-  const undo = () => { dispatch({ t: 'UNDO_EVENT', leagueId, gameId }); setFlash(null); };
-  const redo = () => { dispatch({ t: 'REDO_EVENT', leagueId, gameId }); setFlash(null); };
+  const undo = () => { undoFeedback(); dispatch({ t: 'UNDO_EVENT', leagueId, gameId }); setFlash(null); setMilestone(null); };
+  const redo = () => { tapFeedback(); dispatch({ t: 'REDO_EVENT', leagueId, gameId }); setFlash(null); };
   const canRedo = (league?._redo?.[gameId]?.length ?? 0) > 0;
 
   const nextPeriod = () => {
@@ -148,8 +252,10 @@ export default function LiveGameScreen({ route, navigation }: ScreenProps<'LiveG
     Alert.alert('Finish game?', 'This locks the final score and updates standings. You can still edit the box score after.', [
       { text: 'Keep playing', style: 'cancel' },
       { text: 'Finish', style: 'destructive', onPress: () => {
+        successFeedback();
         dispatch({ t: 'SET_GAME_STATUS', leagueId, gameId, status: 'final' });
-        navigation.replace('BoxScore', { leagueId, gameId });
+        // Land on the celebratory FINAL screen; it leads to the box score.
+        navigation.replace('FinalScore', { leagueId, gameId });
       } },
     ]);
   };
@@ -171,6 +277,14 @@ export default function LiveGameScreen({ route, navigation }: ScreenProps<'LiveG
 
   return (
     <Screen>
+      {/* 🎉 Milestone banner — celebratory, auto-dismisses. Shown in both the
+          scorekeeper tracker and the spectator view (same component). */}
+      {milestone && (
+        <View style={{ position: 'absolute', top: space(2), left: space(4), right: space(4), zIndex: 50,
+          backgroundColor: colors.brandLime, borderRadius: radius.md, paddingVertical: 10, paddingHorizontal: 14, alignItems: 'center' }}>
+          <Txt k="body" color={colors.bg} style={{ fontFamily: font.bodyBold, fontSize: 15, textAlign: 'center' }}>{milestone}</Txt>
+        </View>
+      )}
       <View style={{ flex: 1, paddingHorizontal: space(3), paddingTop: space(1) }}>
         {/* Compact scoreboard */}
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -383,7 +497,7 @@ function SideScore({ team, score, active, onPress, right, teamFouls, timeouts }:
   return (
     <Pressable onPress={onPress} style={{ flex: 1, alignItems: right ? 'flex-end' : 'flex-start' }}>
       <Txt k="label" color={colors.muted} style={{ fontSize: 10 }}>Team Fouls: {teamFouls}</Txt>
-      <Txt k="label" color={colors.muted} style={{ fontSize: 10 }}>Timeouts: {timeouts}</Txt>
+      <Txt k="label" color={colors.muted} style={{ fontSize: 10 }}>Timeout used: {timeouts}</Txt>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
         {!right && <TeamBadge logo={team.logo} color={team.color} size={18} />}
         <Txt k="h2" numberOfLines={1} color={active ? colors.text : colors.muted}>{team.name}</Txt>

@@ -461,6 +461,51 @@ export function InviteCodeModal({ visible, title = 'Enter invite code', message,
   );
 }
 
+// First-run explainer — a friendly, dismissible welcome that demystifies the
+// guest/sign-in model and the invite-code system before the user hits it cold.
+export function OnboardingSheet({ visible, isSignedIn, onClose }: { visible: boolean; isSignedIn: boolean; onClose: () => void }) {
+  if (!visible) return null;
+  const Row = ({ icon, title, body }: { icon: string; title: string; body: string }) => (
+    <View style={{ flexDirection: 'row', gap: 12, marginBottom: space(3) }}>
+      <Text style={{ fontSize: 22 }}>{icon}</Text>
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontFamily: font.bodyBold, fontSize: 15, color: colors.text }}>{title}</Text>
+        <Text style={{ fontFamily: font.body, fontSize: 13, color: colors.muted, marginTop: 2, lineHeight: 18 }}>{body}</Text>
+      </View>
+    </View>
+  );
+  return (
+    <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: '#000C', justifyContent: 'center', alignItems: 'center', padding: space(5), zIndex: 100 }}>
+      <View style={{ width: '100%', maxWidth: 400, backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.line, padding: space(5) }}>
+        <Txt k="h1" style={{ marginBottom: 4 }}>Welcome to iTala</Txt>
+        <Txt k="body" color={colors.muted} style={{ marginBottom: space(4) }}>Record. Track. Elevate. Here's the quick tour:</Txt>
+        <Row icon="👀" title="Anyone can watch" body="Browse leagues, standings, and live games as a guest — no account needed." />
+        <Row icon="🏀" title="Sign in to run games" body="Sign in with Google or Apple to track stats, manage rosters, and share player cards." />
+        <Row icon="🎟" title="Leagues start with a code" body="Creating a league needs a one-time code from a Super Admin. Owners then invite co-owners and scorekeepers with their own share codes." />
+        <Row icon="⚡" title="Everything syncs live" body="Scores update in real time across every device watching the game." />
+        <Button title={isSignedIn ? "Let's go" : "Got it"} onPress={onClose} style={{ marginTop: space(2) }} />
+      </View>
+    </View>
+  );
+}
+
+// Tiny save-state indicator for the Home header. Reassures non-technical users
+// that their work is being saved — "saving…" then a brief "✓ Saved".
+export function SyncBadge({ state }: { state: 'idle' | 'saving' | 'saved' | 'error' }) {
+  if (state === 'idle') return null;
+  const cfg = {
+    saving: { text: 'Saving…', color: colors.muted, dot: colors.muted },
+    saved: { text: 'Saved', color: colors.green, dot: colors.green },
+    error: { text: 'Save failed — will retry', color: colors.red, dot: colors.red },
+  }[state];
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: cfg.dot }} />
+      <Text style={{ fontFamily: font.body, fontSize: 11, color: cfg.color }}>{cfg.text}</Text>
+    </View>
+  );
+}
+
 // Header avatar button: Google photo when signed in, person glyph for guests.
 export function ProfileButton({ avatarUrl, onPress }:
   { avatarUrl?: string | null; onPress: () => void }) {

@@ -30,6 +30,8 @@ import NewGameScreen from './src/screens/NewGameScreen';
 import SelectLineupScreen from './src/screens/SelectLineupScreen';
 import LiveGameScreen from './src/screens/LiveGameScreen';
 import BoxScoreScreen from './src/screens/BoxScoreScreen';
+import FinalScoreScreen from './src/screens/FinalScoreScreen';
+import SeasonRecapScreen from './src/screens/SeasonRecapScreen';
 import PlayerProfileScreen from './src/screens/PlayerProfileScreen';
 
 const Stack = createNativeStackNavigator<RootStackParams>();

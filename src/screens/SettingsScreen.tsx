@@ -1,13 +1,13 @@
 import React, { useState } from 'react';
 import { View, Alert } from 'react-native';
-import { Screen, Txt, Card, Pill, GoogleButton, AppleButton, Button } from '../components/ui';
+import { Screen, Txt, Card, Pill, Toggle, GoogleButton, AppleButton, Button } from '../components/ui';
 import { useStore } from '../store/StoreProvider';
 import { useAdmin } from '../store/AdminProvider';
 import { colors, space } from '../theme';
 import { ScreenProps } from '../navigation';
 
 export default function SettingsScreen({ navigation }: ScreenProps<'Settings'>) {
-  const { synced } = useStore();
+  const { synced, prefs, setHaptics, setNotifs } = useStore();
   const { role, isAdmin, user, userId, signInWithGoogle, appleAvailable, signInWithApple, deleteAccount, signOut, authBusy, lastError } = useAdmin();
   const [busy, setBusy] = useState(false);
 
@@ -86,6 +86,28 @@ export default function SettingsScreen({ navigation }: ScreenProps<'Settings'>) 
             {isAdmin ? 'Admin unlocked on this device (password).' : 'This device is running without an account.'}
           </Txt>
         )}
+      </Card>
+
+      {/* Live tracking */}
+      <Card style={{ marginBottom: space(4) }}>
+        <Txt k="label" style={{ marginBottom: space(2) }}>Live tracking</Txt>
+        <Toggle
+          label="Haptic feedback"
+          description="A light tap you can feel each time you log a stat — handy when you're not looking at the screen. Turn off to save battery."
+          value={prefs.hapticsEnabled ?? true}
+          onChange={setHaptics}
+        />
+      </Card>
+
+      {/* Notifications */}
+      <Card style={{ marginBottom: space(4) }}>
+        <Txt k="label" style={{ marginBottom: space(2) }}>Notifications</Txt>
+        <Toggle
+          label="Game alerts for my favorites"
+          description="Get a notification with the final score when a team you've starred (★) finishes a game. You'll be asked to allow notifications."
+          value={prefs.notifsEnabled ?? false}
+          onChange={setNotifs}
+        />
       </Card>
 
       {/* Sync */}

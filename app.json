@@ -45,7 +45,13 @@
           "photosPermission": "iTala lets you choose a photo from your library to use as a team logo."
         }
       ],
-      "expo-apple-authentication"
+      "expo-apple-authentication",
+      [
+        "expo-notifications",
+        {
+          "color": "#12D7D0"
+        }
+      ]
     ],
     "extra": {
       "eas": {

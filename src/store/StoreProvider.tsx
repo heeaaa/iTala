@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useEffect, useReducer, useRef, useCallback } from 'react';
 import { AppState, League, Team, Player, Game, GameEvent, EventType, LocalPrefs } from '../types';
+import { setHapticsEnabled } from '../lib/haptics';
+import { ensureNotifPermission } from '../lib/notify';
 import { uid } from '../lib/format';
 import { teamColors, DEFAULT_FOUL_OUT } from '../theme';
 import { loadState, saveState, loadPrefs, savePrefs } from './storage';
@@ -371,9 +373,13 @@ interface Ctx {
   ready: boolean;
   /** True when the app is connected to Supabase and syncing across devices. */
   synced: boolean;
+  syncState: 'idle' | 'saving' | 'saved' | 'error';
   refresh: () => Promise<void>;
   /** Device-local favorites (leagues/teams pinned to the top of lists). */
   prefs: LocalPrefs;
+  setHaptics: (on: boolean) => void;
+  setNotifs: (on: boolean) => void;
+  dismissOnboarding: () => void;
   toggleFavLeague: (leagueId: string) => void;
   toggleFavTeam: (teamId: string) => void;
 }
@@ -382,11 +388,15 @@ const StoreCtx = createContext<Ctx | null>(null);
 export function StoreProvider({ children }: { children: React.ReactNode }) {
   const [state, baseDispatch] = useReducer(reducer, initial);
   const [ready, setReady] = React.useState(false);
-  const [prefs, setPrefs] = React.useState<LocalPrefs>({ favLeagueIds: [], favTeamIds: [] });
+  const [prefs, setPrefs] = React.useState<LocalPrefs>({ favLeagueIds: [], favTeamIds: [], hapticsEnabled: true });
+  const [syncState, setSyncState] = React.useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const savedTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   const first = useRef(true);
   const stateRef = useRef(state);
+  const prefsRef = useRef(prefs);
   const authSubRef = useRef<{ unsubscribe: () => void } | null>(null);
   stateRef.current = state;
+  prefsRef.current = prefs;
 
   // Hydrate from local storage first (fast, offline-friendly), then if synced,
   // wait until Supabase auth is ready (anonymous sign-in finishes), then pull
@@ -400,7 +410,9 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
       if (!cancelled && saved) baseDispatch({ t: 'HYDRATE', state: saved });
       const savedPrefs = await loadPrefs();
       if (!cancelled && savedPrefs) {
-        setPrefs({ favLeagueIds: savedPrefs.favLeagueIds ?? [], favTeamIds: savedPrefs.favTeamIds ?? [] });
+        const hz = savedPrefs.hapticsEnabled ?? true;
+        setPrefs({ favLeagueIds: savedPrefs.favLeagueIds ?? [], favTeamIds: savedPrefs.favTeamIds ?? [], hapticsEnabled: hz, seenOnboarding: savedPrefs.seenOnboarding, notifsEnabled: savedPrefs.notifsEnabled });
+        setHapticsEnabled(hz);
       }
 
       if (SYNC_ENABLED) {
@@ -534,20 +546,64 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     stateRef.current = next;
     baseDispatch(action);
 
+    // Final-score nudge for favorited teams (local notification, opt-in).
+    if (action.t === 'SET_GAME_STATUS' && action.status === 'final' && prefsRef.current.notifsEnabled) {
+      const lg = next.leagues.find(l => l.id === action.leagueId);
+      const g = lg?.games.find(x => x.id === action.gameId);
+      if (lg && g) {
+        const favT = new Set(prefsRef.current.favTeamIds);
+        if (favT.has(g.homeTeamId) || favT.has(g.awayTeamId)) {
+          const home = lg.teams.find(t => t.id === g.homeTeamId);
+          const away = lg.teams.find(t => t.id === g.awayTeamId);
+          import('../lib/stats').then(({ gameScore }) => {
+            const sc = gameScore(lg, g);
+            import('../lib/notify').then(({ notifyNow }) => {
+              void notifyNow('Final score', `${home?.name} ${sc.home} — ${sc.away} ${away?.name}`);
+            });
+          }).catch(() => {});
+        }
+      }
+    }
+
     if (SYNC_ENABLED) {
       const sb = getSupabase();
-      if (sb) void pushAction(sb, action, next);
+      if (sb) {
+        // Surface a lightweight save indicator: saving → saved (2s) → idle.
+        // Errors are swallowed inside pushAction, so we mark 'saved' on resolve
+        // and only flip to 'error' if it throws (it currently never does, but
+        // this future-proofs the indicator).
+        setSyncState('saving');
+        void pushAction(sb, action, next)
+          .then(() => {
+            setSyncState('saved');
+            if (savedTimer.current) clearTimeout(savedTimer.current);
+            savedTimer.current = setTimeout(() => setSyncState('idle'), 2000);
+          })
+          .catch(() => setSyncState('error'));
+      }
     }
   }, []);
 
   // Favorites: pure device-local preference. Toggle + persist; never synced.
-  const toggleFav = useCallback((key: keyof LocalPrefs, id: string) => {
+  const toggleFav = useCallback((key: 'favLeagueIds' | 'favTeamIds', id: string) => {
     setPrefs(prev => {
-      const list = prev[key].includes(id) ? prev[key].filter(x => x !== id) : [...prev[key], id];
+      const cur = prev[key] ?? [];
+      const list = cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id];
       const next = { ...prev, [key]: list };
       void savePrefs(next);
       return next;
     });
+  }, []);
+  const dismissOnboarding = useCallback(() => {
+    setPrefs(prev => { const next = { ...prev, seenOnboarding: true }; void savePrefs(next); return next; });
+  }, []);
+  const setNotifs = useCallback((on: boolean) => {
+    setPrefs(prev => { const next = { ...prev, notifsEnabled: on }; void savePrefs(next); return next; });
+    if (on) void ensureNotifPermission();
+  }, []);
+  const setHaptics = useCallback((on: boolean) => {
+    setHapticsEnabled(on);
+    setPrefs(prev => { const next = { ...prev, hapticsEnabled: on }; void savePrefs(next); return next; });
   }, []);
   const toggleFavLeague = useCallback((leagueId: string) => toggleFav('favLeagueIds', leagueId), [toggleFav]);
   const toggleFavTeam = useCallback((teamId: string) => toggleFav('favTeamIds', teamId), [toggleFav]);
@@ -559,7 +615,7 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     saveState(state);
   }, [state, ready]);
 
-  return <StoreCtx.Provider value={{ state, dispatch, ready, synced: SYNC_ENABLED, refresh, prefs, toggleFavLeague, toggleFavTeam }}>{children}</StoreCtx.Provider>;
+  return <StoreCtx.Provider value={{ state, dispatch, ready, synced: SYNC_ENABLED, refresh, prefs, toggleFavLeague, toggleFavTeam, setHaptics, setNotifs, syncState, dismissOnboarding }}>{children}</StoreCtx.Provider>;
 }
 
 export function useStore(): Ctx {

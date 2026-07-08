@@ -4,7 +4,7 @@ import { View, FlatList, Pressable, Alert, TextInput, ScrollView, Dimensions, Re
 const SCREEN_W = Dimensions.get('window').width;
 import {
   Screen, Txt, Card, Button, Pill, Empty, Wordmark, PasswordModal, LivePip,
-  ProfileButton, ProfileSheet, InviteCodeModal,
+  ProfileButton, ProfileSheet, InviteCodeModal, SyncBadge, OnboardingSheet,
 } from '../components/ui';
 import { useStore } from '../store/StoreProvider';
 import { useAdmin } from '../store/AdminProvider';
@@ -17,7 +17,7 @@ import { ScreenProps } from '../navigation';
 const HIDDEN_LOCK_TAPS = 10;
 
 export default function LeaguesScreen({ navigation }: ScreenProps<'Leagues'>) {
-  const { state, ready, prefs, toggleFavLeague, dispatch, refresh, synced } = useStore();
+  const { state, ready, prefs, toggleFavLeague, dispatch, refresh, synced, syncState, dismissOnboarding } = useStore();
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = async () => { setRefreshing(true); try { await refresh(); } finally { setRefreshing(false); } };
   const { role, isAdmin, user, unlock, lock, signOut, signInWithGoogle, appleAvailable, signInWithApple, authBusy, lastError, canScore, isOwner, redeemCode, createCreationCode } = useAdmin();
@@ -157,6 +157,10 @@ Share this with the organizer. It can create exactly one league, then expires.`)
           <Wordmark size={40} />
           <Txt k="body" color={colors.muted} style={{ marginTop: 6 }}>Record. Track. Elevate.</Txt>
         </Pressable>
+        {/* Reassuring save indicator, top-left under the tagline */}
+        <View style={{ position: 'absolute', left: space(4), top: space(2) + 58 }}>
+          <SyncBadge state={syncState} />
+        </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           {/* Settings gear: admin shortcut (Settings is also in the profile sheet) */}
           {isAdmin && (
@@ -235,33 +239,41 @@ Share this with the organizer. It can create exactly one league, then expires.`)
         refreshControl={synced ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brandTeal} colors={[colors.brandTeal]} /> : undefined}
         ListHeaderComponent={(() => {
           if (q) return null; // rec drop-in cards aren't part of search results
-          const recs = visibleLeagues.filter(l => l.kind === 'recreational');
+          // Only show drop-in rows that actually have games (live or past) —
+          // an empty personal space shouldn't clutter the home screen.
+          const recs = visibleLeagues.filter(l =>
+            l.kind === 'recreational' && l.games.length > 0
+          );
           if (recs.length === 0) return null;
           return (
-            <>
-              {recs.map(rec => {
+            <View style={{ marginBottom: space(3) }}>
+              <Txt k="label" color={colors.muted} style={{ marginBottom: space(2) }}>DROP-IN GAMES</Txt>
+              {recs.map((rec, i) => {
                 const finals = rec.games.filter(g => g.status === 'final').length;
                 const live = rec.games.filter(g => g.status === 'live').length;
                 return (
-                  <Card key={rec.id} style={{ marginBottom: space(3), borderColor: colors.brandTeal }} onPress={() => navigation.navigate('LeagueDetail', { leagueId: rec.id })}>
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <View style={{ flex: 1 }}>
-                        <Txt k="h2">🏀 {rec.isShared ? 'Community Drop-In' : 'My Drop-In Games'}</Txt>
-                        <Txt k="body" color={colors.muted}>{rec.isShared ? 'Public ad-hoc games from all users' : 'Your ad-hoc games outside a league'}</Txt>
-                      </View>
-                      {live ? (
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <LivePip size={7} />
-                          <Txt k="label" color={colors.brandLime}>LIVE</Txt>
-                        </View>
-                      ) : (
-                        <Pill label={`${finals} played`} color={colors.surfaceHi} textColor={colors.muted} />
-                      )}
+                  <Pressable key={rec.id}
+                    onPress={() => navigation.navigate('LeagueDetail', { leagueId: rec.id })}
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: colors.line }}>
+                    <Txt k="h2">🏀</Txt>
+                    <View style={{ flex: 1 }}>
+                      <Txt k="body" style={{ fontSize: 15 }}>{rec.isShared ? 'Community Drop-In' : 'Private Drop-In Games'}</Txt>
+                      <Txt k="body" color={colors.muted} style={{ fontSize: 12 }}>
+                        {rec.isShared ? 'Public games from all users' : 'Your private games'}
+                      </Txt>
                     </View>
-                  </Card>
+                    {live ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <LivePip size={7} />
+                        <Txt k="label" color={colors.brandLime}>LIVE</Txt>
+                      </View>
+                    ) : (
+                      <Txt k="body" color={colors.muted} style={{ fontSize: 12 }}>{finals} played ›</Txt>
+                    )}
+                  </Pressable>
                 );
               })}
-            </>
+            </View>
           );
         })()}
         ListEmptyComponent={ready ? (q ? <Empty title="No matches" subtitle={`No league matches "${query}".`} /> : <Empty title="No leagues yet" subtitle="Create your first league to start tracking games." />) : null}
@@ -324,6 +336,12 @@ Share this with the organizer. It can create exactly one league, then expires.`)
           <Button title="+  New League" onPress={onNewLeague} />
         </View>
       )}
+
+      <OnboardingSheet
+        visible={ready && !prefs.seenOnboarding}
+        isSignedIn={!!user}
+        onClose={dismissOnboarding}
+      />
 
       <ProfileSheet
         visible={sheetOpen}

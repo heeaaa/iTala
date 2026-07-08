@@ -93,6 +93,9 @@ export interface AppSettings {
 export interface LocalPrefs {
   favLeagueIds: string[];
   favTeamIds: string[];
+  hapticsEnabled?: boolean; // live-tracker tap feedback (default on)
+  seenOnboarding?: boolean; // dismissed the first-run explainer
+  notifsEnabled?: boolean; // game reminders + final scores for favorites
 }
 
 export interface AppState {

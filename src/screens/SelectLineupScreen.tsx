@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, ScrollView, Pressable } from 'react-native';
 import { Screen, Txt, Card, Button, TeamBadge } from '../components/ui';
 import { useStore, useLeague } from '../store/StoreProvider';
@@ -12,7 +12,27 @@ export default function SelectLineupScreen({ route, navigation }: ScreenProps<'S
   const league = useLeague(leagueId);
   const game = league?.games.find(g => g.id === gameId);
 
-  if (!league || !game) return <Screen><Txt k="body">Game not found.</Txt></Screen>;
+  // Grace period: the game may be a beat behind the navigation that brought us
+  // here (freshly created rec game). Wait briefly before declaring it missing,
+  // so users never see a flash of "Game not found".
+  const [waited, setWaited] = useState(false);
+  useEffect(() => {
+    if (game) return;
+    const t = setTimeout(() => setWaited(true), 1500);
+    return () => clearTimeout(t);
+  }, [game]);
+
+  if (!league || !game) {
+    return (
+      <Screen>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: space(6) }}>
+          {waited
+            ? <Txt k="body" color={colors.muted}>Game not found.</Txt>
+            : <Txt k="body" color={colors.muted}>Setting up the game…</Txt>}
+        </View>
+      </Screen>
+    );
+  }
 
   const homeTeam = league.teams.find(t => t.id === game.homeTeamId)!;
   const awayTeam = league.teams.find(t => t.id === game.awayTeamId)!;
