@@ -8,7 +8,7 @@ import { ScreenProps } from '../navigation';
 import { EventType, Team, Player } from '../types';
 import {
   gameScore, teamBoxScore, teamPeriodFouls, fouledOutSet, playerFouls, effectiveFoulLimit,
-  lineScore, perfRating, teamPeriodTimeouts, careerStats,
+  lineScore, perfRating, teamPeriodTimeouts,
 } from '../lib/stats';
 import { tapFeedback, undoFeedback, successFeedback } from '../lib/haptics';
 
@@ -83,19 +83,30 @@ export default function LiveGameScreen({ route, navigation }: ScreenProps<'LiveG
   }, [trackMisses, trackTurnovers, armed]);
 
   const guardEnabled = !readOnly;
+  const leavingRef = React.useRef(false); // set when WE navigate intentionally
   useEffect(() => {
     if (!guardEnabled) return;
     const unsub = navigation.addListener('beforeRemove', (e: any) => {
+      // Only intercept a genuine back/swipe-dismiss (GO_BACK). Programmatic
+      // navigations we trigger ourselves (finishing → FinalScore) use REPLACE
+      // and must pass straight through — otherwise the guard ate the finish.
+      if (e.data.action.type !== 'GO_BACK') return;
+      // If we've already decided to leave (user confirmed), let it through.
+      if (leavingRef.current) return;
       // Only guard while the game is still live.
       const g = leagueRef.current?.games.find(x => x.id === gameId);
       if (!g || g.status !== 'live') return;
+
       e.preventDefault();
       Alert.alert(
         'Leave live tracking?',
         'The game stays saved — you can come back to it anytime from the league. Leave now?',
         [
           { text: 'Stay', style: 'cancel' },
-          { text: 'Leave', style: 'destructive', onPress: () => navigation.dispatch(e.data.action) },
+          { text: 'Leave', style: 'destructive', onPress: () => {
+            leavingRef.current = true;
+            navigation.dispatch(e.data.action);
+          } },
         ],
       );
     });
@@ -119,7 +130,7 @@ export default function LiveGameScreen({ route, navigation }: ScreenProps<'LiveG
       setMilestone(null);
       bannerBusy.current = false;
       setTimeout(showNextMilestone, 350); // brief gap, then next if any
-    }, 3800);
+    }, 2200);
   }, []);
 
   useEffect(() => {
@@ -136,11 +147,11 @@ export default function LiveGameScreen({ route, navigation }: ScreenProps<'LiveG
         if (!l.playerId) continue;
         const nm = league.players.find(p => p.id === l.playerId)?.name ?? 'Player';
 
-        // Career-high points
-        if (l.pts > 0) {
-          const priorHigh = careerStats(league, l.playerId).highPts;
-          if (priorHigh > 0 && l.pts >= priorHigh) {
-            enqueue(`hi:${l.playerId}:${l.pts}`, `🎉 Career high — ${nm}, ${l.pts} PTS!`);
+        // Scoring milestones — only at big round numbers, not every bucket.
+        // Fires once as the player crosses each threshold this game.
+        for (const threshold of [25, 50, 100]) {
+          if (l.pts >= threshold) {
+            enqueue(`pts${threshold}:${l.playerId}`, `🎉 ${nm} hits ${threshold} points!`);
           }
         }
 
@@ -253,6 +264,7 @@ export default function LiveGameScreen({ route, navigation }: ScreenProps<'LiveG
       { text: 'Keep playing', style: 'cancel' },
       { text: 'Finish', style: 'destructive', onPress: () => {
         successFeedback();
+        leavingRef.current = true; // this navigation is intentional
         dispatch({ t: 'SET_GAME_STATUS', leagueId, gameId, status: 'final' });
         // Land on the celebratory FINAL screen; it leads to the box score.
         navigation.replace('FinalScore', { leagueId, gameId });

@@ -239,6 +239,7 @@ export async function pushAction(sb: SupabaseClient, action: Action, state: AppS
         break;
 
       case 'SET_LINEUP':
+      case 'SET_LINEUPS':
       case 'SUBSTITUTE':
       case 'SET_ATTENDANCE':
       case 'SET_GAME_STATUS':

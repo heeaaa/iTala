@@ -11,16 +11,34 @@ export default function SelectLineupScreen({ route, navigation }: ScreenProps<'S
   const { dispatch } = useStore();
   const league = useLeague(leagueId);
   const game = league?.games.find(g => g.id === gameId);
+  const homeTeam = league?.teams.find(t => t.id === game?.homeTeamId);
+  const awayTeam = league?.teams.find(t => t.id === game?.awayTeamId);
 
-  // Grace period: the game may be a beat behind the navigation that brought us
-  // here (freshly created rec game). Wait briefly before declaring it missing,
-  // so users never see a flash of "Game not found".
+  // ALL hooks run unconditionally, before any early return (React rules).
   const [waited, setWaited] = useState(false);
+  // Lazy initial state seeds the first five synchronously on first render when
+  // teams are already present (the common league-flow case), so the defaults
+  // are correct immediately without waiting for an effect tick.
+  const [home, setHome] = useState<string[]>(() =>
+    homeTeam && !homeTeam.teamOnly ? homeTeam.playerIds.slice(0, LINEUP_SIZE) : []);
+  const [away, setAway] = useState<string[]>(() =>
+    awayTeam && !awayTeam.teamOnly ? awayTeam.playerIds.slice(0, LINEUP_SIZE) : []);
+  const seededRef = React.useRef(!!(homeTeam && awayTeam));
+
   useEffect(() => {
     if (game) return;
     const t = setTimeout(() => setWaited(true), 1500);
     return () => clearTimeout(t);
   }, [game]);
+
+  // Fallback seed for the rec flow where teams may arrive a beat after mount:
+  // populate once, the first render where both teams exist.
+  useEffect(() => {
+    if (seededRef.current || !homeTeam || !awayTeam) return;
+    seededRef.current = true;
+    setHome(homeTeam.teamOnly ? [] : homeTeam.playerIds.slice(0, LINEUP_SIZE));
+    setAway(awayTeam.teamOnly ? [] : awayTeam.playerIds.slice(0, LINEUP_SIZE));
+  }, [homeTeam, awayTeam]);
 
   if (!league || !game) {
     return (
@@ -34,21 +52,31 @@ export default function SelectLineupScreen({ route, navigation }: ScreenProps<'S
     );
   }
 
-  const homeTeam = league.teams.find(t => t.id === game.homeTeamId)!;
-  const awayTeam = league.teams.find(t => t.id === game.awayTeamId)!;
-
-  const initial = (team: Team) =>
-    team.teamOnly ? [] : team.playerIds.slice(0, LINEUP_SIZE);
-
-  const [home, setHome] = useState<string[]>(initial(homeTeam));
-  const [away, setAway] = useState<string[]>(initial(awayTeam));
+  // The game row can arrive a beat before its team rows during a fresh rec
+  // creation. Don't dereference teams until both exist.
+  if (!homeTeam || !awayTeam) {
+    return (
+      <Screen>
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: space(6) }}>
+          {waited
+            ? <Txt k="body" color={colors.muted}>Teams not found for this game.</Txt>
+            : <Txt k="body" color={colors.muted}>Setting up the game…</Txt>}
+        </View>
+      </Screen>
+    );
+  }
 
   const ready =
     (homeTeam.teamOnly || home.length > 0) && (awayTeam.teamOnly || away.length > 0);
 
   const start = () => {
-    if (!homeTeam.teamOnly) dispatch({ t: 'SET_LINEUP', leagueId, gameId, side: 'home', playerIds: home });
-    if (!awayTeam.teamOnly) dispatch({ t: 'SET_LINEUP', leagueId, gameId, side: 'away', playerIds: away });
+    // One combined write so a realtime echo can't land between two separate
+    // dispatches and clear the away side (the "away lineup not set" bug).
+    dispatch({
+      t: 'SET_LINEUPS', leagueId, gameId,
+      home: homeTeam.teamOnly ? [] : home,
+      away: awayTeam.teamOnly ? [] : away,
+    });
     navigation.replace('LiveGame', { leagueId, gameId, spectator: false });
   };
 

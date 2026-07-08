@@ -22,6 +22,7 @@ export type Action =
   | { t: 'DELETE_PLAYER'; leagueId: string; teamId: string; playerId: string }
   | { t: 'CREATE_GAME'; id: string; leagueId: string; homeTeamId: string; awayTeamId: string; location?: string; homeOnCourt?: string[]; awayOnCourt?: string[] }
   | { t: 'SET_LINEUP'; leagueId: string; gameId: string; side: 'home' | 'away'; playerIds: string[] }
+  | { t: 'SET_LINEUPS'; leagueId: string; gameId: string; home: string[]; away: string[] }
   | { t: 'SUBSTITUTE'; leagueId: string; gameId: string; side: 'home' | 'away'; outId: string; inId: string }
   | { t: 'ADD_EVENT'; leagueId: string; gameId: string; teamId: string; playerId: string | null; type: EventType; period: number; note?: string }
   | { t: 'UNDO_EVENT'; leagueId: string; gameId: string }
@@ -163,6 +164,16 @@ function reducer(state: AppState, a: Action): AppState {
           g.id === a.gameId
             ? { ...g, [a.side === 'home' ? 'homeOnCourt' : 'awayOnCourt']: a.playerIds }
             : g
+        ),
+      }));
+
+    case 'SET_LINEUPS':
+      // Both starting fives in ONE update — avoids a realtime re-pull landing
+      // between two separate SET_LINEUP writes and wiping the second side.
+      return mapLeague(state, a.leagueId, l => ({
+        ...l,
+        games: l.games.map(g =>
+          g.id === a.gameId ? { ...g, homeOnCourt: a.home, awayOnCourt: a.away } : g
         ),
       }));
 
