@@ -8,6 +8,7 @@ import { Swipeable, RectButton } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { colors, font, radius, space, brandGradient, wordmarkGradient } from '../theme';
+import { Promo } from '../types';
 
 // Team logo if present, else a colored dot. Used everywhere a team name appears.
 export function TeamBadge({ logo, color, size = 12 }: { logo?: string; color: string; size?: number }) {
@@ -491,6 +492,73 @@ export function OnboardingSheet({ visible, isSignedIn, onClose }: { visible: boo
 
 // Tiny save-state indicator for the Home header. Reassures non-technical users
 // that their work is being saved — "saving…" then a brief "✓ Saved".
+
+// ---- Sponsor promos ----------------------------------------------------------
+// Shared "SPONSORED" tag for honesty across every promo placement.
+function SponsoredTag() {
+  return (
+    <View style={{ backgroundColor: 'rgba(255,255,255,0.12)', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 2, alignSelf: 'flex-start' }}>
+      <Text style={{ fontFamily: font.body, fontSize: 9, letterSpacing: 1, color: colors.muted }}>SPONSORED</Text>
+    </View>
+  );
+}
+
+// Home spotlight card. Rotates through active promos when more than one.
+export function PromoCard({ promos, onPress }: { promos: Promo[]; onPress: (p: Promo) => void }) {
+  const [idx, setIdx] = useState(0);
+  React.useEffect(() => {
+    if (promos.length <= 1) return;
+    const t = setInterval(() => setIdx(i => (i + 1) % promos.length), 5000);
+    return () => clearInterval(t);
+  }, [promos.length]);
+  if (promos.length === 0) return null;
+  const p = promos[idx % promos.length];
+  const tappable = !!p.link;
+  const Body = (
+    <View style={{ borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, overflow: 'hidden' }}>
+      {p.image ? (
+        <Image source={{ uri: p.image }} style={{ width: '100%', height: 150 }} resizeMode="cover" />
+      ) : null}
+      <View style={{ padding: 12, gap: 4 }}>
+        <SponsoredTag />
+        <Text style={{ fontFamily: font.bodyBold, fontSize: 15, color: colors.text }}>{p.title}</Text>
+        {p.tagline ? <Text style={{ fontFamily: font.body, fontSize: 13, color: colors.muted }}>{p.tagline}</Text> : null}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 2 }}>
+          {p.sponsorName ? <Text style={{ fontFamily: font.body, fontSize: 11, color: colors.muted }}>{p.sponsorName}</Text> : <View />}
+          {tappable ? <Text style={{ fontFamily: font.body, fontSize: 12, color: colors.brandTeal }}>Learn more ›</Text> : null}
+        </View>
+        {promos.length > 1 ? (
+          <View style={{ flexDirection: 'row', gap: 5, marginTop: 6, justifyContent: 'center' }}>
+            {promos.map((_, i) => (
+              <View key={i} style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: i === (idx % promos.length) ? colors.brandTeal : colors.line }} />
+            ))}
+          </View>
+        ) : null}
+      </View>
+    </View>
+  );
+  return tappable
+    ? <Pressable onPress={() => onPress(p)}>{Body}</Pressable>
+    : Body;
+}
+
+// Compact strip for the FinalScore screen and the spectator live view.
+export function PromoStrip({ promo, onPress }: { promo: Promo; onPress: (p: Promo) => void }) {
+  const tappable = !!promo.link;
+  const Body = (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, padding: 10 }}>
+      {promo.image ? <Image source={{ uri: promo.image }} style={{ width: 40, height: 40, borderRadius: 8 }} resizeMode="cover" /> : null}
+      <View style={{ flex: 1 }}>
+        <SponsoredTag />
+        <Text numberOfLines={1} style={{ fontFamily: font.bodyBold, fontSize: 13, color: colors.text, marginTop: 2 }}>{promo.title}</Text>
+        {promo.sponsorName ? <Text numberOfLines={1} style={{ fontFamily: font.body, fontSize: 11, color: colors.muted }}>{promo.sponsorName}</Text> : null}
+      </View>
+      {tappable ? <Text style={{ fontFamily: font.body, fontSize: 12, color: colors.brandTeal }}>›</Text> : null}
+    </View>
+  );
+  return tappable ? <Pressable onPress={() => onPress(promo)}>{Body}</Pressable> : Body;
+}
+
 export function SyncBadge({ state }: { state: 'idle' | 'saving' | 'saved' | 'error' }) {
   if (state === 'idle') return null;
   const cfg = {

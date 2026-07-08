@@ -14,7 +14,7 @@ export function findRecLeagueId(leagues: { id: string; kind?: string }[]): strin
   return leagues.find(l => l.kind === 'recreational')?.id;
 }
 
-interface TeamDraft { name: string; players: { id: string; name: string; num: string }[]; }
+interface TeamDraft { name: string; color: string; players: { id: string; name: string; num: string }[]; }
 
 export default function RecGameScreen({ navigation }: ScreenProps<'RecGame'>) {
   const { state, dispatch, synced } = useStore();
@@ -25,8 +25,8 @@ export default function RecGameScreen({ navigation }: ScreenProps<'RecGame'>) {
   const [trackTurnovers, setTrackTurnovers] = useState(true);
   const [signInBusy, setSignInBusy] = useState(false);
   const [teams, setTeams] = useState<[TeamDraft, TeamDraft]>([
-    { name: '', players: [] },
-    { name: '', players: [] },
+    { name: '', color: teamColors[0], players: [] },
+    { name: '', color: teamColors[1], players: [] },
   ]);
   const [draftName, setDraftName] = useState<[string, string]>(['', '']);
   const [draftNum, setDraftNum] = useState<[string, string]>(['', '']);
@@ -50,6 +50,16 @@ export default function RecGameScreen({ navigation }: ScreenProps<'RecGame'>) {
       return copy;
     });
   };
+
+  // Tap the swatch to cycle through the palette — simplest possible picker,
+  // no modal. Long list of distinct colors so two teams never clash.
+  const cycleColor = (ti: 0 | 1) =>
+    setTeams(prev => {
+      const c: [TeamDraft, TeamDraft] = [{ ...prev[0] }, { ...prev[1] }];
+      const idx = teamColors.indexOf(c[ti].color);
+      c[ti].color = teamColors[(idx + 1) % teamColors.length];
+      return c;
+    });
 
   const setTeamName = (ti: 0 | 1, name: string) =>
     setTeams(prev => { const c: [TeamDraft, TeamDraft] = [{ ...prev[0] }, { ...prev[1] }]; c[ti].name = name; return c; });
@@ -92,8 +102,8 @@ export default function RecGameScreen({ navigation }: ScreenProps<'RecGame'>) {
       trackMisses, trackTurnovers,
       ensureLeague,
       teams: [
-        { id: uid(), name: teams[0].name.trim(), players: teams[0].players.map(p => ({ id: p.id, name: p.name, number: p.num || undefined })) },
-        { id: uid(), name: teams[1].name.trim(), players: teams[1].players.map(p => ({ id: p.id, name: p.name, number: p.num || undefined })) },
+        { id: uid(), name: teams[0].name.trim(), color: teams[0].color, players: teams[0].players.map(p => ({ id: p.id, name: p.name, number: p.num || undefined })) },
+        { id: uid(), name: teams[1].name.trim(), color: teams[1].color, players: teams[1].players.map(p => ({ id: p.id, name: p.name, number: p.num || undefined })) },
       ],
     });
 
@@ -163,7 +173,10 @@ export default function RecGameScreen({ navigation }: ScreenProps<'RecGame'>) {
           return (
             <Card key={ti} style={{ marginBottom: space(3) }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: space(2) }}>
-                <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: teamColors[ti] }} />
+                <Pressable onPress={() => cycleColor(ti)} hitSlop={10}
+                  style={{ width: 26, height: 26, borderRadius: 13, backgroundColor: t.color, borderWidth: 2, borderColor: colors.line, alignItems: 'center', justifyContent: 'center' }}>
+                  <Txt k="body" color="#fff" style={{ fontSize: 11, opacity: 0.85 }}>⟳</Txt>
+                </Pressable>
                 <TextInput
                   value={t.name} onChangeText={(v) => setTeamName(ti, v)}
                   placeholder={`Team ${ti + 1} name`} placeholderTextColor={colors.muted}

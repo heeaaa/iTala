@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect, useCallback } from 'react';
 import { useKeepAwake } from 'expo-keep-awake';
 import { View, Pressable, ScrollView, Alert, Modal, TextInput } from 'react-native';
-import { Screen, Txt, Button, Segmented, TeamBadge, LivePip } from '../components/ui';
+import { Screen, Txt, Button, Segmented, TeamBadge, LivePip, PromoStrip } from '../components/ui';
 import { useStore, useLeague } from '../store/StoreProvider';
 import { colors, space, radius, font, statColors, MAX_PERIOD, LINEUP_SIZE } from '../theme';
 import { ScreenProps } from '../navigation';
@@ -11,6 +11,7 @@ import {
   lineScore, perfRating, teamPeriodTimeouts,
 } from '../lib/stats';
 import { tapFeedback, undoFeedback, successFeedback } from '../lib/haptics';
+import { usePromos, onPromoTap } from '../lib/usePromos';
 
 type PadBtn = { label: string; type: EventType; color: string };
 const MISS_ROW: PadBtn[] = [
@@ -39,6 +40,7 @@ const PBP_LABEL: Record<EventType, string> = {
 export default function LiveGameScreen({ route, navigation }: ScreenProps<'LiveGame'>) {
   const { leagueId, gameId, spectator } = route.params;
   const readOnly = !!spectator;
+  const { activePromos } = usePromos();
   const { state, dispatch } = useStore();
   const league = useLeague(leagueId);
   const game = league?.games.find(g => g.id === gameId);
@@ -432,7 +434,14 @@ export default function LiveGameScreen({ route, navigation }: ScreenProps<'LiveG
 
         {/* Color-coded stat pad — admins only. Spectators get the fan dashboard. */}
         {readOnly ? (
-          <SpectatorPanel league={league} game={game} activeTeam={activeTeam} onCourtIds={onCourtIds} />
+          <>
+            {activePromos.length > 0 ? (
+              <View style={{ marginTop: space(2) }}>
+                <PromoStrip promo={activePromos[0]} onPress={onPromoTap} />
+              </View>
+            ) : null}
+            <SpectatorPanel league={league} game={game} activeTeam={activeTeam} onCourtIds={onCourtIds} />
+          </>
         ) : (
           <View style={{ paddingBottom: space(2), marginTop: space(2) }}>
             {PAD.map((row, ri) => (

@@ -20,6 +20,7 @@ export type RootStackParams = {
     | { leagueId: string; kind: 'game'; gameId: string; playerId: string }
     | { leagueId: string; kind: 'season' }
     | { leagueId: string; kind: 'averages'; playerId: string };
+  ManagePromos: undefined;
   PlayerProfile: { leagueId: string; playerId: string };
 };
 

@@ -240,6 +240,32 @@ export async function pushAction(sb: SupabaseClient, action: Action, state: AppS
         check('DELETE_games', await sb.from('games').delete().eq('id', action.gameId));
         break;
 
+      case 'CLEANUP_REC_GAMES': {
+        // Delete the games first (events cascade via FK). Then remove teams and
+        // players that the reducer pruned (i.e. no longer present locally),
+        // which are exactly the ones used only by the deleted games.
+        for (const gid of action.gameIds) {
+          check('CLEANUP_games', await sb.from('games').delete().eq('id', gid));
+        }
+        const l = state.leagues.find(x => x.id === action.leagueId);
+        if (l) {
+          const liveTeamIds = new Set(l.teams.map(t => t.id));
+          const livePlayerIds = new Set(l.players.map(p => p.id));
+          // Pull server rows for this league and delete any not still local.
+          const [{ data: tRows }, { data: pRows }] = await Promise.all([
+            sb.from('teams').select('id').eq('league_id', l.id),
+            sb.from('players').select('id').eq('league_id', l.id),
+          ]);
+          for (const r of (tRows ?? []) as { id: string }[]) {
+            if (!liveTeamIds.has(r.id)) check('CLEANUP_teams', await sb.from('teams').delete().eq('id', r.id));
+          }
+          for (const r of (pRows ?? []) as { id: string }[]) {
+            if (!livePlayerIds.has(r.id)) check('CLEANUP_players', await sb.from('players').delete().eq('id', r.id));
+          }
+        }
+        break;
+      }
+
       case 'SET_LINEUP':
       case 'SET_LINEUPS':
       case 'SUBSTITUTE':

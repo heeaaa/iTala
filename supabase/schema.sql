@@ -679,6 +679,57 @@ begin
 end $$;
 
 -- =============================================================================
+-- 6b) SPONSOR PROMOS — Super-Admin-managed marketing cards (e.g. BPBL Clothing)
+-- =============================================================================
+-- Small table of sponsor promos shown on Home (rotating), the FinalScore
+-- screen, and the spectator live view. Images are stored as compressed data
+-- URIs for V1 (same approach as team logos); migrate to Storage if the library
+-- grows. Public read (everyone sees promos); Super-Admin-only writes.
+create table if not exists public.promos (
+  id           text primary key,
+  sponsor_name text,
+  title        text not null,
+  tagline      text,
+  image        text,            -- data URI (compressed) or null
+  link         text,            -- optional tap-through URL
+  active       boolean not null default true,
+  taps         integer not null default 0,
+  created_at   bigint not null
+);
+alter table public.promos enable row level security;
+
+drop policy if exists "promos_read_all"   on public.promos;
+drop policy if exists "promos_write_admin" on public.promos;
+-- Anyone signed in (incl. anonymous spectators) can read promos.
+create policy "promos_read_all" on public.promos
+  for select using (auth.uid() is not null);
+-- Only Super Admins may insert/update/delete.
+create policy "promos_write_admin" on public.promos
+  for all using (public.is_admin()) with check (public.is_admin());
+
+-- Tap counter: any signed-in user may increment taps (for sponsor ROI), but
+-- nothing else. SECURITY DEFINER so the bump bypasses the admin-only write
+-- policy while still only ever touching the taps column.
+create or replace function public.bump_promo_tap(p_id text)
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  update public.promos set taps = taps + 1 where id = p_id;
+$$;
+
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'promos'
+  ) then
+    alter publication supabase_realtime add table public.promos;
+  end if;
+end $$;
+
+-- =============================================================================
 -- 7) PING — keeps the project from auto-pausing after 7 idle days
 -- =============================================================================
 -- An external scheduler (GitHub Actions / UptimeRobot) calls this function to

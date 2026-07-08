@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, ScrollView, Pressable } from 'react-native';
+import { View, ScrollView, Pressable, ActivityIndicator } from 'react-native';
 import { Screen, Txt, Card, Button, TeamBadge } from '../components/ui';
 import { useStore, useLeague } from '../store/StoreProvider';
 import { colors, space, radius, LINEUP_SIZE } from '../theme';
@@ -40,23 +40,13 @@ export default function SelectLineupScreen({ route, navigation }: ScreenProps<'S
     setAway(awayTeam.teamOnly ? [] : awayTeam.playerIds.slice(0, LINEUP_SIZE));
   }, [homeTeam, awayTeam]);
 
-  // Only reveal the "setting up" placeholder text after a short beat — a
-  // fast-resolving screen (the common case) then shows nothing rather than a
-  // one-frame flash of placeholder text before the real content.
-  const [showPlaceholder, setShowPlaceholder] = useState(false);
-  useEffect(() => {
-    const t = setTimeout(() => setShowPlaceholder(true), 250);
-    return () => clearTimeout(t);
-  }, []);
-
   if (!league || !game) {
     return (
       <Screen>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: space(6) }}>
-          {!showPlaceholder ? null
-            : waited
+          {waited
             ? <Txt k="body" color={colors.muted}>Game not found.</Txt>
-            : <Txt k="body" color={colors.muted}>Setting up the game…</Txt>}
+            : <ActivityIndicator color={colors.brandTeal} size="large" />}
         </View>
       </Screen>
     );
@@ -68,10 +58,9 @@ export default function SelectLineupScreen({ route, navigation }: ScreenProps<'S
     return (
       <Screen>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: space(6) }}>
-          {!showPlaceholder ? null
-            : waited
+          {waited
             ? <Txt k="body" color={colors.muted}>Teams not found for this game.</Txt>
-            : <Txt k="body" color={colors.muted}>Setting up the game…</Txt>}
+            : <ActivityIndicator color={colors.brandTeal} size="large" />}
         </View>
       </Screen>
     );

@@ -15,6 +15,7 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
   const { canScore, isOwner, isAdmin, getLeagueCodes, regenerateLeagueCode, listMembers, removeMember, user } = useAdmin();
   const [tab, setTab] = useState(0);
   const [rosterQuery, setRosterQuery] = useState('');
+  const [showOlderTeams, setShowOlderTeams] = useState(false);
   const [teamFilter, setTeamFilter] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [dupOpen, setDupOpen] = useState(false);
@@ -66,16 +67,23 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
           return (
             <Pressable key={g.id}
               onPress={() => navigation.navigate('LiveGame', { leagueId, gameId: g.id, spectator: !scorer })}
-              style={{ marginTop: space(3), backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.brandTeal, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <LivePip size={8} />
-              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <TeamBadge logo={h?.logo} color={h?.color ?? colors.muted} size={14} />
-                <Txt k="body" numberOfLines={1} style={{ flexShrink: 1 }}>{h?.name}</Txt>
-                <Txt k="stat" color={colors.accent}>{sc.home}–{sc.away}</Txt>
-                <Txt k="body" numberOfLines={1} style={{ flexShrink: 1 }}>{a?.name}</Txt>
-                <TeamBadge logo={a?.logo} color={a?.color ?? colors.muted} size={14} />
+              style={{ marginTop: space(3), backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.brandTeal, padding: 12 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <LivePip size={8} />
+                <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <TeamBadge logo={h?.logo} color={h?.color ?? colors.muted} size={14} />
+                  <Txt k="body" numberOfLines={1} style={{ flexShrink: 1 }}>{h?.name}</Txt>
+                  <Txt k="stat" color={colors.accent}>{sc.home}–{sc.away}</Txt>
+                  <Txt k="body" numberOfLines={1} style={{ flexShrink: 1 }}>{a?.name}</Txt>
+                  <TeamBadge logo={a?.logo} color={a?.color ?? colors.muted} size={14} />
+                </View>
+                <Txt k="label" color={colors.brandLime}>WATCH</Txt>
               </View>
-              <Txt k="label" color={colors.brandLime}>WATCH</Txt>
+              {g.location ? (
+                <Txt k="body" color={colors.muted} numberOfLines={1} style={{ fontSize: 11, marginTop: 6, marginLeft: 18 }}>
+                  📍 {g.location}
+                </Txt>
+              ) : null}
             </Pressable>
           );
         })}
@@ -219,6 +227,42 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
           league.games.length === 0
             ? <Empty title="No games yet" subtitle="Tap Start Game to keep stats live." />
             : (() => {
+                // Cleanup is available for drop-in spaces only. Private = anyone
+                // who can score; Community (shared) = Super Admin only.
+                const canCleanup = isRec && (league.isShared ? isAdmin : scorer);
+                const runCleanup = (maxAgeDays: number | null) => {
+                  const now = Date.now();
+                  const cutoff = maxAgeDays === null ? Infinity : now - maxAgeDays * 86400_000;
+                  const doomed = league.games.filter(g =>
+                    g.status === 'final' && (maxAgeDays === null || (g.finishedAt ?? g.scheduledAt ?? 0) < cutoff)
+                  );
+                  if (doomed.length === 0) {
+                    Alert.alert('Nothing to clean up', 'No finished games match that time range.');
+                    return;
+                  }
+                  const whenTxt = maxAgeDays === null ? 'all finished games' : `finished games older than ${maxAgeDays} days`;
+                  Alert.alert(
+                    'Clean up drop-in games?',
+                    `Delete ${doomed.length} ${whenTxt}, along with their teams and players? This can't be undone.`,
+                    [
+                      { text: 'Cancel', style: 'cancel' },
+                      { text: `Delete ${doomed.length}`, style: 'destructive',
+                        onPress: () => dispatch({ t: 'CLEANUP_REC_GAMES', leagueId, gameIds: doomed.map(g => g.id) }) },
+                    ],
+                  );
+                };
+                const openCleanupMenu = () => {
+                  Alert.alert(
+                    'Clean up finished games',
+                    'Remove old drop-in games and their teams to keep this space tidy. Live games are never touched.',
+                    [
+                      { text: 'Older than 3 days', onPress: () => runCleanup(3) },
+                      { text: 'Older than 1 week', onPress: () => runCleanup(7) },
+                      { text: 'All finished games', style: 'destructive', onPress: () => runCleanup(null) },
+                      { text: 'Cancel', style: 'cancel' },
+                    ],
+                  );
+                };
                 const filtered = teamFilter
                   ? league.games.filter(g => g.homeTeamId === teamFilter || g.awayTeamId === teamFilter)
                   : league.games;
@@ -275,6 +319,14 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
                     </View>
                   </Card>
                     ))}
+                    {canCleanup && league.games.some(g => g.status === 'final') && (
+                      <Button
+                        title="🧹 Clean up old games"
+                        kind="ghost"
+                        onPress={openCleanupMenu}
+                        style={{ marginTop: space(1) }}
+                      />
+                    )}
                   </>
                 );
               })()
@@ -448,7 +500,31 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
               if (q && teams.length === 0) {
                 return <Empty title="No matches" subtitle={`Nothing matches "${rosterQuery}".`} />;
               }
-              return teams.map(({ t, visiblePlayers }) => (
+
+              // Auto-hide: in drop-in spaces, teams whose most recent finished
+              // game is >2 weeks old are tucked into a collapsible section so
+              // the active roster stays tidy. Nothing is deleted. Teams with a
+              // recent game, no games yet, or during an active search stay in
+              // the main list.
+              const TWO_WEEKS = 14 * 86400_000;
+              const now = Date.now();
+              const lastGameMs = (teamId: string) => {
+                let ms = -1;
+                for (const g of league.games) {
+                  if (g.status !== 'final') continue;
+                  if (g.homeTeamId !== teamId && g.awayTeamId !== teamId) continue;
+                  ms = Math.max(ms, g.finishedAt ?? g.scheduledAt ?? 0);
+                }
+                return ms;
+              };
+              const isOld = (teamId: string) => {
+                const ms = lastGameMs(teamId);
+                return ms > 0 && now - ms > TWO_WEEKS;
+              };
+              const activeTeams = teams.filter(({ t }) => !isRec || q || !isOld(t.id));
+              const olderTeams = (isRec && !q) ? teams.filter(({ t }) => isOld(t.id)) : [];
+
+              const renderTeamCard = ({ t, visiblePlayers }: typeof teams[number]) => (
                 <Card key={t.id} style={{ marginBottom: space(3) }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8 }}>
                     <Pressable onPress={() => navigation.navigate('TeamProfile', { leagueId, teamId: t.id })}
@@ -456,11 +532,9 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
                       <TeamBadge logo={t.logo} color={t.color} size={18} />
                       <Txt k="h2" style={{ flex: 1 }}>{t.name}</Txt>
                     </Pressable>
-                    {/* Favorite star: pins this team to the top of rosters and filters */}
                     <Pressable onPress={() => toggleFavTeam(t.id)} hitSlop={10} style={{ padding: 2 }}>
                       <Txt k="h2" color={favTeams.has(t.id) ? colors.yellow : colors.muted}>{favTeams.has(t.id) ? '★' : '☆'}</Txt>
                     </Pressable>
-                    {/* close the profile-link pressable's sibling group */}
                     {t.teamOnly ? <Pill label="opponent" color={colors.surfaceHi} textColor={colors.muted} /> : null}
                     {scorer && (
                       <Pressable onPress={() => navigation.navigate('EditTeam', { leagueId, teamId: t.id })} hitSlop={8}
@@ -480,7 +554,25 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
                   ))}
                   {visiblePlayers.length === 0 && <Txt k="body" color={colors.muted}>No players.</Txt>}
                 </Card>
-              ));
+              );
+
+              return (
+                <>
+                  {activeTeams.map(renderTeamCard)}
+                  {olderTeams.length > 0 && (
+                    <>
+                      <Pressable onPress={() => setShowOlderTeams(v => !v)}
+                        style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 10, marginBottom: space(1) }}>
+                        <Txt k="body" color={colors.accent}>
+                          {showOlderTeams ? '▾' : '▸'} Older teams ({olderTeams.length})
+                        </Txt>
+                        <Txt k="body" color={colors.muted} style={{ fontSize: 11, flex: 1 }}>from games over 2 weeks ago</Txt>
+                      </Pressable>
+                      {showOlderTeams && olderTeams.map(renderTeamCard)}
+                    </>
+                  )}
+                </>
+              );
             })()}
             {scorer && (
               <Button title="+ Add / edit teams & players" kind="ghost" onPress={() => navigation.navigate('ManageRoster', { leagueId })} />

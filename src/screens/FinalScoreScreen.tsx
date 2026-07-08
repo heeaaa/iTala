@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { View, Animated, Easing } from 'react-native';
-import { Screen, Txt, Button, TeamBadge } from '../components/ui';
+import { Screen, Txt, Button, TeamBadge, PromoStrip } from '../components/ui';
 import { useLeague } from '../store/StoreProvider';
 import { colors, space, radius, font } from '../theme';
 import { ScreenProps } from '../navigation';
 import { gameScore, teamBoxScore, perfRating } from '../lib/stats';
+import { usePromos, onPromoTap } from '../lib/usePromos';
 
 // The emotional payoff at the buzzer. A brief, celebratory FINAL card —
 // winner, score, and Player of the Game — before the user continues to the
@@ -13,6 +14,12 @@ export default function FinalScoreScreen({ route, navigation }: ScreenProps<'Fin
   const { leagueId, gameId } = route.params;
   const league = useLeague(leagueId);
   const game = league?.games.find(g => g.id === gameId);
+  const { activePromos } = usePromos();
+  // Pick one promo once (stable across the animation's re-renders).
+  const promoPick = React.useMemo(
+    () => activePromos.length ? activePromos[Math.floor(Math.random() * activePromos.length)] : null,
+    [activePromos.length],
+  );
 
   const fade = useState(new Animated.Value(0))[0];
   const pop = useState(new Animated.Value(0.9))[0];
@@ -88,6 +95,11 @@ export default function FinalScoreScreen({ route, navigation }: ScreenProps<'Fin
       </Animated.View>
 
       <View style={{ paddingHorizontal: space(4), paddingBottom: space(6), gap: 10 }}>
+        {promoPick ? (
+          <View style={{ marginBottom: space(2) }}>
+            <PromoStrip promo={promoPick!} onPress={onPromoTap} />
+          </View>
+        ) : null}
         <Button title="View box score" onPress={() => navigation.replace('BoxScore', { leagueId, gameId })} />
       </View>
     </Screen>

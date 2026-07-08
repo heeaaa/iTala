@@ -91,7 +91,7 @@ export const AchievementCard = React.forwardRef<View, { spec: CardSpec; layout: 
           <MiniWordmark size={isStory ? 34 : 28} />
           {spec.mvp ? (
             <View style={{ backgroundColor: colors.brandLime, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 5 }}>
-              <Text style={{ fontFamily: font.display, fontSize: 13, color: colors.bg, letterSpacing: 1 }}>MVP</Text>
+              <Text style={{ fontFamily: font.display, fontSize: 13, lineHeight: 18, color: colors.bg, letterSpacing: 1, includeFontPadding: true } as any}>MVP</Text>
             </View>
           ) : null}
         </View>
@@ -100,7 +100,7 @@ export const AchievementCard = React.forwardRef<View, { spec: CardSpec; layout: 
         <View style={{ paddingHorizontal: padX, marginTop: isStory ? 40 : 20 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             {spec.badge ? <Text style={{ fontSize: isStory ? 40 : 30 }}>{spec.badge}</Text> : null}
-            <Text style={{ fontFamily: font.display, fontSize: isStory ? 24 : 18, color: accent, letterSpacing: 2 }}>
+            <Text style={{ fontFamily: font.display, fontSize: isStory ? 24 : 18, lineHeight: isStory ? 32 : 24, color: accent, letterSpacing: 2, includeFontPadding: true } as any}>
               {spec.kicker.toUpperCase()}
             </Text>
           </View>
@@ -116,7 +116,7 @@ export const AchievementCard = React.forwardRef<View, { spec: CardSpec; layout: 
               <TeamBadge logo={spec.teamLogo} color={spec.teamColor ?? colors.muted} size={isStory ? 40 : 32} />
             ) : null}
             <View style={{ flex: 1 }}>
-              <Text numberOfLines={2} style={{ fontFamily: font.display, fontSize: nameSize, lineHeight: nameSize * 1.05, color: colors.text }}>
+              <Text numberOfLines={2} style={{ fontFamily: font.display, fontSize: nameSize, lineHeight: nameSize * 1.32, color: colors.text, includeFontPadding: true, paddingTop: nameSize * 0.08 } as any}>
                 {spec.playerName}
               </Text>
               {spec.subtitle ? (
@@ -131,7 +131,7 @@ export const AchievementCard = React.forwardRef<View, { spec: CardSpec; layout: 
         {/* PRIMARY STAT — hero number */}
         {primary ? (
           <View style={{ paddingHorizontal: padX, marginTop: isStory ? 40 : 20 }}>
-            <Text style={{ fontFamily: font.display, fontSize: primarySize, lineHeight: primarySize * 1.02, color: accent }}>
+            <Text style={{ fontFamily: font.display, fontSize: primarySize, lineHeight: primarySize * 1.28, color: accent, includeFontPadding: true, paddingTop: primarySize * 0.06 } as any}>
               {primary.value}
             </Text>
             <Text style={{ fontFamily: font.body, fontSize: isStory ? 16 : 13, color: colors.muted, letterSpacing: 2, marginTop: -6 }}>
@@ -145,7 +145,7 @@ export const AchievementCard = React.forwardRef<View, { spec: CardSpec; layout: 
           <View style={{ flexDirection: 'row', paddingHorizontal: padX, marginTop: isStory ? 34 : 18, gap: 10, flexWrap: 'wrap' }}>
             {rest.map((s, i) => (
               <View key={i} style={{ flex: 1, minWidth: 80, backgroundColor: colors.surface, borderRadius: 14, borderWidth: 1, borderColor: colors.line, paddingVertical: isStory ? 16 : 12, alignItems: 'center' }}>
-                <Text style={{ fontFamily: font.display, fontSize: isStory ? 34 : 26, color: colors.text }}>{s.value}</Text>
+                <Text style={{ fontFamily: font.display, fontSize: isStory ? 34 : 26, lineHeight: isStory ? 46 : 36, color: colors.text, includeFontPadding: true } as any}>{s.value}</Text>
                 <Text style={{ fontFamily: font.body, fontSize: isStory ? 12 : 10, color: colors.muted, letterSpacing: 1, marginTop: 2 }}>{s.label.toUpperCase()}</Text>
               </View>
             ))}

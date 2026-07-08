@@ -41,6 +41,7 @@ export type Action =
   | { t: 'REDO_EVENT'; leagueId: string; gameId: string }
   | { t: 'DELETE_EVENT'; leagueId: string; eventId: string }
   | { t: 'DELETE_GAME'; leagueId: string; gameId: string }
+  | { t: 'CLEANUP_REC_GAMES'; leagueId: string; gameIds: string[] }
   | { t: 'SET_GAME_STATUS'; leagueId: string; gameId: string; status: Game['status'] }
   | { t: 'SET_ATTENDANCE'; leagueId: string; gameId: string; playerIds: string[] }
   | { t: 'SET_PERIOD'; leagueId: string; gameId: string; period: number }
@@ -280,6 +281,27 @@ function reducer(state: AppState, a: Action): AppState {
         games: l.games.filter(g => g.id !== a.gameId),
         events: l.events.filter(e => e.gameId !== a.gameId), // drop all stats logged for that game
       }));
+
+    case 'CLEANUP_REC_GAMES':
+      return mapLeague(state, a.leagueId, l => {
+        const kill = new Set(a.gameIds);
+        const survivingGames = l.games.filter(g => !kill.has(g.id));
+        // Teams still referenced by a surviving game must be kept.
+        const keepTeam = new Set<string>();
+        for (const g of survivingGames) { keepTeam.add(g.homeTeamId); keepTeam.add(g.awayTeamId); }
+        const teams = l.teams.filter(t => keepTeam.has(t.id));
+        // Players belong to teams; keep only players on surviving teams.
+        const keepPlayer = new Set<string>();
+        for (const t of teams) for (const pid of t.playerIds) keepPlayer.add(pid);
+        const players = l.players.filter(p => keepPlayer.has(p.id));
+        return {
+          ...l,
+          games: survivingGames,
+          events: l.events.filter(e => !kill.has(e.gameId)),
+          teams,
+          players,
+        };
+      });
 
     case 'SET_ATTENDANCE':
       return mapLeague(state, a.leagueId, l => ({

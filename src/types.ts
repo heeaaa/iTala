@@ -108,6 +108,19 @@ export interface AppState {
   settings: AppSettings;
 }
 
+// Sponsor promo (Super-Admin managed). Global, not league-scoped.
+export interface Promo {
+  id: string;
+  sponsorName?: string;
+  title: string;
+  tagline?: string;
+  image?: string;   // compressed data URI
+  link?: string;    // optional tap-through URL
+  active: boolean;
+  taps: number;
+  createdAt: number;
+}
+
 // A computed per-player box score line.
 export interface StatLine {
   playerId: string | null;

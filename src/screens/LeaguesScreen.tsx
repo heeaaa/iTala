@@ -4,8 +4,9 @@ import { View, FlatList, Pressable, Alert, TextInput, ScrollView, Dimensions, Re
 const SCREEN_W = Dimensions.get('window').width;
 import {
   Screen, Txt, Card, Button, Pill, Empty, Wordmark, PasswordModal, LivePip,
-  ProfileButton, ProfileSheet, InviteCodeModal, SyncBadge, OnboardingSheet,
+  ProfileButton, ProfileSheet, InviteCodeModal, SyncBadge, OnboardingSheet, PromoCard,
 } from '../components/ui';
+import { usePromos, onPromoTap } from '../lib/usePromos';
 import { useStore } from '../store/StoreProvider';
 import { useAdmin } from '../store/AdminProvider';
 import { colors, space, font, radius } from '../theme';
@@ -19,6 +20,7 @@ const HIDDEN_LOCK_TAPS = 10;
 export default function LeaguesScreen({ navigation }: ScreenProps<'Leagues'>) {
   const { state, ready, prefs, toggleFavLeague, dispatch, refresh, synced, syncState, dismissOnboarding } = useStore();
   const [refreshing, setRefreshing] = useState(false);
+  const { activePromos } = usePromos();
   const onRefresh = async () => { setRefreshing(true); try { await refresh(); } finally { setRefreshing(false); } };
   const { role, isAdmin, user, unlock, lock, signOut, signInWithGoogle, appleAvailable, signInWithApple, authBusy, lastError, canScore, isOwner, redeemCode, createCreationCode } = useAdmin();
   const [askPw, setAskPw] = useState(false);
@@ -239,41 +241,49 @@ Share this with the organizer. It can create exactly one league, then expires.`)
         refreshControl={synced ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.brandTeal} colors={[colors.brandTeal]} /> : undefined}
         ListHeaderComponent={(() => {
           if (q) return null; // rec drop-in cards aren't part of search results
-          // Only show drop-in rows that actually have games (live or past) —
-          // an empty personal space shouldn't clutter the home screen.
           const recs = visibleLeagues.filter(l =>
             l.kind === 'recreational' && l.games.length > 0
           );
-          if (recs.length === 0) return null;
+          const showPromo = activePromos.length > 0;
+          if (recs.length === 0 && !showPromo) return null;
           return (
-            <View style={{ marginBottom: space(3) }}>
-              <Txt k="label" color={colors.muted} style={{ marginBottom: space(2) }}>RECREATIONAL/DROP-IN GAMES</Txt>
-              {recs.map((rec, i) => {
-                const finals = rec.games.filter(g => g.status === 'final').length;
-                const live = rec.games.filter(g => g.status === 'live').length;
-                return (
-                  <Pressable key={rec.id}
-                    onPress={() => navigation.navigate('LeagueDetail', { leagueId: rec.id })}
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: colors.line }}>
-                    <Txt k="h2">🏀</Txt>
-                    <View style={{ flex: 1 }}>
-                      <Txt k="body" style={{ fontSize: 15 }}>{rec.isShared ? 'Community Drop-in Games (Papawis)' : 'Private Drop-In Games'}</Txt>
-                      <Txt k="body" color={colors.muted} style={{ fontSize: 12 }}>
-                        {rec.isShared ? 'Public games from all users' : 'Your private games'}
-                      </Txt>
-                    </View>
-                    {live ? (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <LivePip size={7} />
-                        <Txt k="label" color={colors.brandLime}>LIVE</Txt>
+            <>
+              {showPromo && (
+                <View style={{ marginBottom: space(3) }}>
+                  <PromoCard promos={activePromos} onPress={onPromoTap} />
+                </View>
+              )}
+              {recs.length > 0 && (
+              <View style={{ marginBottom: space(3) }}>
+                <Txt k="label" color={colors.muted} style={{ marginBottom: space(2) }}>RECREATIONAL/DROP-IN GAMES</Txt>
+                {recs.map((rec, i) => {
+                  const finals = rec.games.filter(g => g.status === 'final').length;
+                  const live = rec.games.filter(g => g.status === 'live').length;
+                  return (
+                    <Pressable key={rec.id}
+                      onPress={() => navigation.navigate('LeagueDetail', { leagueId: rec.id })}
+                      style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: colors.line }}>
+                      <Txt k="h2">🏀</Txt>
+                      <View style={{ flex: 1 }}>
+                        <Txt k="body" style={{ fontSize: 15 }}>{rec.isShared ? 'Community Drop-in Games (Papawis)' : 'Private Drop-In Games'}</Txt>
+                        <Txt k="body" color={colors.muted} style={{ fontSize: 12 }}>
+                          {rec.isShared ? 'Public games from all users' : 'Your private games'}
+                        </Txt>
                       </View>
-                    ) : (
-                      <Txt k="body" color={colors.muted} style={{ fontSize: 12 }}>{finals} played ›</Txt>
-                    )}
-                  </Pressable>
-                );
-              })}
-            </View>
+                      {live ? (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <LivePip size={7} />
+                          <Txt k="label" color={colors.brandLime}>LIVE</Txt>
+                        </View>
+                      ) : (
+                        <Txt k="body" color={colors.muted} style={{ fontSize: 12 }}>{finals} played ›</Txt>
+                      )}
+                    </Pressable>
+                  );
+                })}
+              </View>
+              )}
+            </>
           );
         })()}
         ListEmptyComponent={ready ? (q ? <Empty title="No matches" subtitle={`No league matches "${query}".`} /> : <Empty title="No leagues yet" subtitle="Create your first league to start tracking games." />) : null}
@@ -331,6 +341,9 @@ Share this with the organizer. It can create exactly one league, then expires.`)
         }}>
           {isAdmin && (
             <Button title="🎟  Create league-creation code" kind="ghost" onPress={() => { void onMintCode(); }} />
+          )}
+          {isAdmin && (
+            <Button title="📣  Sponsor promos" kind="ghost" onPress={() => navigation.navigate('ManagePromos')} />
           )}
           <Button title="🏀  Recreational / Drop-In Game" kind="ghost" onPress={() => navigation.navigate('RecGame')} />
           <Button title="+  New League" onPress={onNewLeague} />
