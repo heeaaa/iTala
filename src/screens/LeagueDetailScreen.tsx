@@ -374,6 +374,14 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
                   <Button
                     title="🎉 View & share Season Recap"
                     onPress={() => navigation.navigate('SeasonRecap', { leagueId })}
+                    style={{ marginBottom: space(2) }}
+                  />
+                )}
+                {finalsCount >= 6 && (
+                  <Button
+                    title="🏅 Share award cards"
+                    kind="ghost"
+                    onPress={() => navigation.navigate('ShareCard', { leagueId, kind: 'season' })}
                     style={{ marginBottom: space(3) }}
                   />
                 )}

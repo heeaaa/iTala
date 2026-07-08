@@ -32,6 +32,7 @@ import LiveGameScreen from './src/screens/LiveGameScreen';
 import BoxScoreScreen from './src/screens/BoxScoreScreen';
 import FinalScoreScreen from './src/screens/FinalScoreScreen';
 import SeasonRecapScreen from './src/screens/SeasonRecapScreen';
+import ShareCardScreen from './src/screens/ShareCardScreen';
 import PlayerProfileScreen from './src/screens/PlayerProfileScreen';
 
 const Stack = createNativeStackNavigator<RootStackParams>();
@@ -104,10 +105,11 @@ export default function App() {
           <Stack.Screen name="EditTeam" component={EditTeamScreen} options={{ title: 'Edit Team' }} />
                 <Stack.Screen name="NewGame" component={NewGameScreen} options={brandHeader} />
                 <Stack.Screen name="SelectLineup" component={SelectLineupScreen} options={brandHeader} />
-                <Stack.Screen name="LiveGame" component={LiveGameScreen} options={{ ...brandHeader, headerBackVisible: false }} />
+                <Stack.Screen name="LiveGame" component={LiveGameScreen} options={{ ...brandHeader, headerBackVisible: false, gestureEnabled: false }} />
                 <Stack.Screen name="BoxScore" component={BoxScoreScreen} options={{ title: 'Box Score' }} />
                 <Stack.Screen name="FinalScore" component={FinalScoreScreen} options={{ ...brandHeader, headerBackVisible: false, gestureEnabled: false }} />
                 <Stack.Screen name="SeasonRecap" component={SeasonRecapScreen} options={brandHeader} />
+                <Stack.Screen name="ShareCard" component={ShareCardScreen} options={{ ...brandHeader, title: 'Share Card' }} />
                 <Stack.Screen name="PlayerProfile" component={PlayerProfileScreen} options={brandHeader} />
               </Stack.Navigator>
             </NavigationContainer>

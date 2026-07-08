@@ -35,7 +35,7 @@ export type Action =
   | { t: 'DUPLICATE_LEAGUE'; sourceLeagueId: string; newLeagueId: string; name: string; season: string }
   | { t: 'SET_LEAGUE_SETTINGS'; leagueId: string; trackMisses?: boolean; trackTurnovers?: boolean; isClosed?: boolean; isArchived?: boolean }
   | { t: 'SET_SETTINGS'; settings: Partial<AppState['settings']> }
-  | { t: 'REC_SETUP_GAME'; leagueId: string; gameId: string; location?: string; ensureLeague?: { name: string; isShared?: boolean }; teams: [RecTeamInput, RecTeamInput] }
+  | { t: 'REC_SETUP_GAME'; leagueId: string; gameId: string; location?: string; trackMisses?: boolean; trackTurnovers?: boolean; ensureLeague?: { name: string; isShared?: boolean }; teams: [RecTeamInput, RecTeamInput] }
 
 const defaultSettings = { trackMisses: true };
 const initial: AppState = { leagues: [], settings: { ...defaultSettings } };
@@ -361,6 +361,7 @@ function reducer(state: AppState, a: Action): AppState {
             id: a.gameId, leagueId: a.leagueId,
             homeTeamId: newTeams[0].id, awayTeamId: newTeams[1].id,
             status: 'live', scheduledAt: Date.now(), location: a.location,
+            trackMisses: a.trackMisses, trackTurnovers: a.trackTurnovers,
             homeOnCourt: [], awayOnCourt: [], period: 1,
           };
           return {

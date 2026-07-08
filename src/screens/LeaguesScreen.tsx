@@ -247,7 +247,7 @@ Share this with the organizer. It can create exactly one league, then expires.`)
           if (recs.length === 0) return null;
           return (
             <View style={{ marginBottom: space(3) }}>
-              <Txt k="label" color={colors.muted} style={{ marginBottom: space(2) }}>DROP-IN GAMES</Txt>
+              <Txt k="label" color={colors.muted} style={{ marginBottom: space(2) }}>RECREATIONAL/DROP-IN GAMES</Txt>
               {recs.map((rec, i) => {
                 const finals = rec.games.filter(g => g.status === 'final').length;
                 const live = rec.games.filter(g => g.status === 'live').length;
@@ -257,7 +257,7 @@ Share this with the organizer. It can create exactly one league, then expires.`)
                     style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12, borderTopWidth: i === 0 ? 0 : 1, borderTopColor: colors.line }}>
                     <Txt k="h2">🏀</Txt>
                     <View style={{ flex: 1 }}>
-                      <Txt k="body" style={{ fontSize: 15 }}>{rec.isShared ? 'Community Drop-In' : 'Private Drop-In Games'}</Txt>
+                      <Txt k="body" style={{ fontSize: 15 }}>{rec.isShared ? 'Community Drop-in Games (Papawis)' : 'Private Drop-In Games'}</Txt>
                       <Txt k="body" color={colors.muted} style={{ fontSize: 12 }}>
                         {rec.isShared ? 'Public games from all users' : 'Your private games'}
                       </Txt>

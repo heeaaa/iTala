@@ -20,7 +20,7 @@ import { AppState, GameEvent, League, Player, Team, Game } from '../types';
 interface LeagueRow { id: string; name: string; season: string; kind: 'league' | 'recreational'; foul_out_limit: number | null; track_misses: boolean | null; track_turnovers: boolean | null; is_shared: boolean | null; is_closed: boolean | null; is_archived: boolean | null; created_at: number; }
 interface TeamRow   { id: string; league_id: string; name: string; color: string; logo: string | null; coach: string | null; team_only: boolean; player_ids: string[]; }
 interface PlayerRow { id: string; league_id: string; name: string; number: string | null; origin_player_id: string | null; }
-interface GameRow   { id: string; league_id: string; home_team_id: string; away_team_id: string; status: 'scheduled'|'live'|'final'; scheduled_at: number | null; location: string | null; finished_at: number | null; home_on_court: string[]; away_on_court: string[]; period: number | null; attendance: string[] | null; }
+interface GameRow   { id: string; league_id: string; home_team_id: string; away_team_id: string; status: 'scheduled'|'live'|'final'; scheduled_at: number | null; location: string | null; finished_at: number | null; home_on_court: string[]; away_on_court: string[]; period: number | null; attendance: string[] | null; track_misses: boolean | null; track_turnovers: boolean | null; }
 interface EventRow  { id: string; league_id: string; game_id: string; team_id: string; player_id: string | null; type: string; period: number; ts: number; note: string | null; }
 
 const leagueFromRow = (r: LeagueRow, teams: Team[], players: Player[], games: Game[], events: GameEvent[]): League => ({
@@ -47,6 +47,8 @@ const playerFromRow = (r: PlayerRow): Player => ({
 const gameFromRow = (r: GameRow): Game => ({
   id: r.id, leagueId: r.league_id, homeTeamId: r.home_team_id, awayTeamId: r.away_team_id,
   attendance: r.attendance ?? undefined,
+  trackMisses: r.track_misses ?? undefined,
+  trackTurnovers: r.track_turnovers ?? undefined,
   status: r.status,
   scheduledAt: r.scheduled_at ?? undefined,
   location: r.location ?? undefined,
@@ -357,6 +359,8 @@ function gameToRow(g: Game) {
     away_on_court: g.awayOnCourt ?? [],
     period: g.period ?? 1,
     attendance: g.attendance ?? null,
+    track_misses: g.trackMisses ?? null,
+    track_turnovers: g.trackTurnovers ?? null,
   };
 }
 

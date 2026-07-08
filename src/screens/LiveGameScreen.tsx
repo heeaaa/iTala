@@ -64,8 +64,9 @@ export default function LiveGameScreen({ route, navigation }: ScreenProps<'LiveG
   // Stat pad respects the LEAGUE's settings: the miss row and the TOV button
   // appear only when enabled for this league. Misses fall back to the legacy
   // global for old data; turnovers default on.
-  const trackMisses = league?.trackMisses ?? state.settings.trackMisses;
-  const trackTurnovers = league?.trackTurnovers ?? true;
+  // Per-game overrides (drop-in games) win; otherwise the league setting.
+  const trackMisses = game?.trackMisses ?? league?.trackMisses ?? state.settings.trackMisses;
+  const trackTurnovers = game?.trackTurnovers ?? league?.trackTurnovers ?? true;
   const PAD: PadBtn[][] = (() => {
     const rows = trackMisses ? [PAD_MAKES, MISS_ROW, ...PAD_OTHER] : [PAD_MAKES, ...PAD_OTHER];
     if (trackTurnovers) {
@@ -84,13 +85,40 @@ export default function LiveGameScreen({ route, navigation }: ScreenProps<'LiveG
 
   const guardEnabled = !readOnly;
   const leavingRef = React.useRef(false); // set when WE navigate intentionally
+
+  // iOS's back-swipe is a NATIVE gesture: it visually dismisses the screen
+  // before JS can ask "are you sure?" — un-preventable in any clean way on
+  // native-stack. So for scorekeepers we disable the gesture entirely (an
+  // accidental exit becomes impossible) and provide an explicit ✕ Exit button
+  // that confirms while the screen is still fully present. Spectators keep
+  // the natural swipe — nothing to protect there.
+  useEffect(() => {
+    navigation.setOptions({ gestureEnabled: readOnly });
+  }, [navigation, readOnly]);
+
+  const confirmExit = () => {
+    const g = leagueRef.current?.games.find(x => x.id === gameId);
+    if (readOnly || !g || g.status !== 'live') { navigation.goBack(); return; }
+    Alert.alert(
+      'Leave live tracking?',
+      'The game stays saved — you can come back to it anytime from the league. Leave now?',
+      [
+        { text: 'Stay', style: 'cancel' },
+        { text: 'Leave', style: 'destructive', onPress: () => {
+          leavingRef.current = true;
+          navigation.goBack();
+        } },
+      ],
+    );
+  };
   useEffect(() => {
     if (!guardEnabled) return;
     const unsub = navigation.addListener('beforeRemove', (e: any) => {
-      // Only intercept back-type actions. IMPORTANT: on native-stack the
-      // header back button and the swipe gesture dispatch 'POP', while
-      // programmatic goBack() dispatches 'GO_BACK' — guard both. Programmatic
-      // navigations we trigger ourselves (finish → REPLACE) pass through.
+      // This guard now serves the ANDROID HARDWARE BACK (a JS-driven event
+      // that preventDefault genuinely stops before any transition) and any
+      // programmatic goBack. The iOS swipe is handled by disabling the
+      // gesture above — it cannot be reliably intercepted on native-stack.
+      // Programmatic navigations we trigger (finish → REPLACE) pass through.
       const t = e.data.action.type;
       if (t !== 'GO_BACK' && t !== 'POP' && t !== 'POP_TO_TOP') return;
       // If we've already decided to leave (user confirmed), let it through.
@@ -334,6 +362,7 @@ export default function LiveGameScreen({ route, navigation }: ScreenProps<'LiveG
 
         {/* Controls row */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: space(2), gap: 6 }}>
+          {!readOnly && <MiniBtn label="✕" onPress={confirmExit} />}
           {!readOnly && <MiniBtn label="⇄ Court" onPress={() => setSwapped(s => !s)} />}
           <MiniBtn label={readOnly ? "📋 Play-by-play" : "📋 Log"} onPress={() => setLogOpen(true)} />
           {!readOnly && <MiniBtn label="⏱ Timeout" onPress={() => setTimeoutOpen(true)} />}

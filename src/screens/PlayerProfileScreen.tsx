@@ -11,7 +11,7 @@ import { ScreenProps } from '../navigation';
 import { careerStats } from '../lib/stats';
 import { dateLabel } from '../lib/format';
 
-export default function PlayerProfileScreen({ route }: ScreenProps<'PlayerProfile'>) {
+export default function PlayerProfileScreen({ route, navigation }: ScreenProps<'PlayerProfile'>) {
   const { leagueId, playerId } = route.params;
   const league = useLeague(leagueId);
   const { role, signInWithGoogle, appleAvailable, signInWithApple, authBusy, lastError } = useAdmin();
@@ -96,7 +96,13 @@ export default function PlayerProfileScreen({ route }: ScreenProps<'PlayerProfil
         <Empty title="No games played yet" subtitle="Stats appear after this player's first finished game." />
       ) : (
         <>
-          <Button title="Share stat card" onPress={onSharePress} kind="ghost" style={{ marginBottom: space(3) }} />
+          <Button title="Share stat card" onPress={onSharePress} kind="ghost" style={{ marginBottom: space(2) }} />
+          <Button
+            title="✨ Achievement cards"
+            kind="primary"
+            style={{ marginBottom: space(3) }}
+            onPress={() => navigation.navigate('ShareCard', { leagueId, kind: 'averages', playerId })}
+          />
 
           <Card style={{ marginBottom: space(3) }}>
             <Txt k="label" style={{ marginBottom: space(2) }}>Season averages</Txt>

@@ -165,6 +165,11 @@ alter table public.players add column if not exists origin_player_id text;
 -- Post-game attendance: player ids present at the game (null = not recorded;
 -- the app then falls back to "played = present").
 alter table public.games add column if not exists attendance text[];
+-- Per-game stat-tracking overrides for drop-in games (null = inherit the
+-- league-level setting; set at creation for rec games so one user's choice
+-- never flips settings for everyone in the shared community space).
+alter table public.games add column if not exists track_misses boolean;
+alter table public.games add column if not exists track_turnovers boolean;
 
 create table if not exists public.teams (
   id           text primary key,

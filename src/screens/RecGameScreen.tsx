@@ -21,6 +21,8 @@ export default function RecGameScreen({ navigation }: ScreenProps<'RecGame'>) {
   const { role, userId, isOwner, signInWithGoogle, appleAvailable, signInWithApple, authBusy, lastError } = useAdmin();
   const [location, setLocation] = useState('');
   const [makePublic, setMakePublic] = useState(false);
+  const [trackMisses, setTrackMisses] = useState(true);
+  const [trackTurnovers, setTrackTurnovers] = useState(true);
   const [signInBusy, setSignInBusy] = useState(false);
   const [teams, setTeams] = useState<[TeamDraft, TeamDraft]>([
     { name: '', players: [] },
@@ -53,6 +55,7 @@ export default function RecGameScreen({ navigation }: ScreenProps<'RecGame'>) {
     setTeams(prev => { const c: [TeamDraft, TeamDraft] = [{ ...prev[0] }, { ...prev[1] }]; c[ti].name = name; return c; });
 
   const ready =
+    location.trim().length > 0 &&
     teams[0].name.trim() && teams[1].name.trim() &&
     teams[0].players.length > 0 && teams[1].players.length > 0;
 
@@ -70,7 +73,7 @@ export default function RecGameScreen({ navigation }: ScreenProps<'RecGame'>) {
     if (makePublic) {
       const existing = state.leagues.find(l => l.kind === 'recreational' && l.isShared);
       recId = existing?.id ?? 'rec-shared';
-      if (!existing) ensureLeague = { name: 'Community Drop-In', isShared: true };
+      if (!existing) ensureLeague = { name: 'Community Drop-in Games (Papawis)', isShared: true };
     } else {
       const existing = state.leagues.find(l => l.kind === 'recreational' && !l.isShared && isOwner(l));
       recId = existing?.id ?? `rec-${userId ?? 'local'}`;
@@ -85,7 +88,8 @@ export default function RecGameScreen({ navigation }: ScreenProps<'RecGame'>) {
       t: 'REC_SETUP_GAME',
       leagueId: recId,
       gameId,
-      location: location.trim() || undefined,
+      location: location.trim(),
+      trackMisses, trackTurnovers,
       ensureLeague,
       teams: [
         { id: uid(), name: teams[0].name.trim(), players: teams[0].players.map(p => ({ id: p.id, name: p.name, number: p.num || undefined })) },
@@ -128,14 +132,28 @@ export default function RecGameScreen({ navigation }: ScreenProps<'RecGame'>) {
           Quick ad-hoc game outside a league. Add a location and two teams with players, then pick your starting fives.
         </Txt>
 
-        <Field label="Location" value={location} onChangeText={setLocation} placeholder="Main Gym, Court 2…" />
+        <Field label="Location (required)" value={location} onChangeText={setLocation} placeholder="Main Gym, Court 2…" />
 
         <Card style={{ marginBottom: space(4) }}>
           <Toggle
             label="Make this game public"
-            description="Public games go into the shared Community Drop-In space that every signed-in user can see and add to. Off = the game stays in your personal drop-in space."
+            description="Public games go into the shared Community Drop-in Games (Papawis) space that every signed-in user can see and add to. Off = the game stays in your personal drop-in space."
             value={makePublic}
             onChange={setMakePublic}
+          />
+          <View style={{ height: space(3) }} />
+          <Toggle
+            label="Track missed shots"
+            description="Show the 2PT ✗, 3PT ✗, and FT ✗ buttons in the live tracker, enabling FG% for this game. Off = log makes only (faster)."
+            value={trackMisses}
+            onChange={setTrackMisses}
+          />
+          <View style={{ height: space(3) }} />
+          <Toggle
+            label="Track turnovers"
+            description="Show the TOV button in the live tracker and the TO column in this game's box score."
+            value={trackTurnovers}
+            onChange={setTrackTurnovers}
           />
         </Card>
 

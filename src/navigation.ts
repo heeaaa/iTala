@@ -16,6 +16,10 @@ export type RootStackParams = {
   BoxScore: { leagueId: string; gameId: string };
   FinalScore: { leagueId: string; gameId: string };
   SeasonRecap: { leagueId: string };
+  ShareCard:
+    | { leagueId: string; kind: 'game'; gameId: string; playerId: string }
+    | { leagueId: string; kind: 'season' }
+    | { leagueId: string; kind: 'averages'; playerId: string };
   PlayerProfile: { leagueId: string; playerId: string };
 };
 

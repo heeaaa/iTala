@@ -195,6 +195,7 @@ export interface LeagueAwards {
   playerOfMonth: AwardWinner | null;  // best single-game rating, last 30 days
   scoringChampion: AwardWinner | null;
   assistLeader: AwardWinner | null;
+  reboundingLeader: AwardWinner | null; // rebounds per game
   bestDefender: AwardWinner | null;   // steals + blocks per game
   mostImproved: AwardWinner | null;   // rating jump, 2nd half vs 1st half of their games
   seasonMVP: AwardWinner | null;      // best composite rating per game
@@ -271,6 +272,7 @@ export function leagueAwards(league: League, opts?: { restrictTeamIds?: Set<stri
     playerOfMonth: bestInWindow(30),
     scoringChampion: topBy(r => r.ppg, r => `${r.ppg.toFixed(1)} PPG`),
     assistLeader: topBy(r => r.apg, r => `${r.apg.toFixed(1)} APG`),
+    reboundingLeader: topBy(r => r.rpg, r => `${r.rpg.toFixed(1)} RPG`),
     bestDefender: topBy(r => r.spg + r.bpg, r => `${(r.spg + r.bpg).toFixed(1)} stocks/gm`),
     mostImproved: improved,
     seasonMVP: topBy(r => r.rating, r => `${r.rating.toFixed(1)} rating`),

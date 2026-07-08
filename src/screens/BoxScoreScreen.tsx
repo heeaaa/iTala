@@ -27,6 +27,7 @@ export default function BoxScoreScreen({ route, navigation }: ScreenProps<'BoxSc
   const [side, setSide] = useState(0);
   const [askSignIn, setAskSignIn] = useState(false);
   const [attOpen, setAttOpen] = useState(false);
+  const [cardPickOpen, setCardPickOpen] = useState(false);
   // Attendance draft: starts from what's saved, else auto-seeds with everyone
   // who recorded a stat ("played = present"). Benched-but-present players get
   // checked manually.
@@ -163,6 +164,31 @@ export default function BoxScoreScreen({ route, navigation }: ScreenProps<'BoxSc
 
         <Button title="Share box-score card" onPress={onSharePress} kind="ghost" style={{ marginBottom: space(2) }} />
         {game.status === 'final' && (
+          <Button
+            title="🏅 Player achievement cards"
+            kind="ghost"
+            style={{ marginBottom: space(2) }}
+            onPress={() => setCardPickOpen(v => !v)}
+          />
+        )}
+        {game.status === 'final' && cardPickOpen && (
+          <Card style={{ marginBottom: space(2) }}>
+            <Txt k="label" color={colors.muted} style={{ marginBottom: space(2) }}>Pick a player to make a shareable card</Txt>
+            {allLines.filter(r => r.l.playerId && (r.l.pts || r.l.reb || r.l.ast || r.l.stl || r.l.blk)).map(({ l, teamId }) => {
+              const team = league!.teams.find(t => t.id === teamId);
+              return (
+                <Pressable key={l.playerId}
+                  onPress={() => navigation.navigate('ShareCard', { leagueId, kind: 'game', gameId, playerId: l.playerId! })}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderTopWidth: 1, borderTopColor: colors.line }}>
+                  <TeamBadge logo={team?.logo} color={team?.color ?? colors.muted} size={16} />
+                  <Txt k="body" style={{ flex: 1 }}>{playerName(l.playerId)}</Txt>
+                  <Txt k="body" color={colors.muted} style={{ fontSize: 12 }}>{l.pts} PTS · {l.reb} REB · {l.ast} AST ›</Txt>
+                </Pressable>
+              );
+            })}
+          </Card>
+        )}
+        {game.status === 'final' && (
           <Button title="⇩ Export box score (CSV)" onPress={() => { void exportCsv(); }} kind="ghost" style={{ marginBottom: space(2) }} />
         )}
         {game.status === 'final' && league && canScore(league) && (
@@ -241,7 +267,7 @@ export default function BoxScoreScreen({ route, navigation }: ScreenProps<'BoxSc
         <View style={{ height: space(3) }} />
 
         {/* Box score table */}
-        <BoxTable lines={box.lines} total={box.total} nameOf={playerName} trackMisses={league.trackMisses ?? state.settings.trackMisses} trackTurnovers={league.trackTurnovers ?? true} />
+        <BoxTable lines={box.lines} total={box.total} nameOf={playerName} trackMisses={game.trackMisses ?? league.trackMisses ?? state.settings.trackMisses} trackTurnovers={game.trackTurnovers ?? league.trackTurnovers ?? true} />
 
         {/* Play-by-play */}
         <Txt k="label" style={{ marginTop: space(5), marginBottom: 8 }}>Play-by-play</Txt>

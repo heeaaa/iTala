@@ -57,7 +57,12 @@ export interface Game {
   homeOnCourt?: string[]; // player ids currently on the floor (max 5)
   awayOnCourt?: string[];
   period?: number;
-  attendance?: string[]; // player ids present at this game (undefined = not recorded)        // current live period (persists across screen navigation)
+  attendance?: string[]; // player ids present at this game (undefined = not recorded)
+  // Per-game stat-tracking overrides (used by drop-in games, where the shared
+  // container's league-level setting can't be one user's to change).
+  // undefined = inherit the league setting.
+  trackMisses?: boolean;
+  trackTurnovers?: boolean;        // current live period (persists across screen navigation)
 }
 
 export interface League {
