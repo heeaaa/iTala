@@ -8,6 +8,18 @@ import { loadState, saveState, loadPrefs, savePrefs } from './storage';
 import { getSupabase, SYNC_ENABLED } from '../sync/supabase';
 import { fetchAllState, pushAction, subscribeRealtime } from '../sync/sync';
 
+// gameId -> expiry timestamp. Lineups written locally are protected from being
+// overwritten by a lagging realtime echo until the expiry passes.
+const lineupGuard = new Map<string, number>();
+const LINEUP_GUARD_MS = 2500;
+function guardLineup(gameId: string) { lineupGuard.set(gameId, Date.now() + LINEUP_GUARD_MS); }
+function isLineupGuarded(gameId: string) {
+  const exp = lineupGuard.get(gameId);
+  if (exp === undefined) return false;
+  if (Date.now() > exp) { lineupGuard.delete(gameId); return false; }
+  return true;
+}
+
 interface RecTeamInput { id: string; name: string; color?: string; players: { id: string; name: string; number?: string }[] }
 
 export type Action =
@@ -49,12 +61,23 @@ function reducer(state: AppState, a: Action): AppState {
     case 'HYDRATE': {
       // older saved states may not have settings — backfill with defaults
       const settings = { ...defaultSettings, ...(a.state.settings ?? {}) };
-      // MIGRATION: trackMisses moved from app-wide to per-league. Leagues
-      // saved before the move have no own value — seed them from the legacy
-      // global so nobody's live tracker changes shape after updating.
-      const leagues = a.state.leagues.map(l =>
-        l.trackMisses === undefined ? { ...l, trackMisses: settings.trackMisses } : l
-      );
+      // Build a quick lookup of the CURRENT (pre-hydrate) games so we can
+      // preserve just-written lineups that the incoming snapshot may not have
+      // yet (see lineupGuard). Everything else takes the server value.
+      const currentGames = new Map<string, Game>();
+      for (const l of state.leagues) for (const g of l.games) currentGames.set(g.id, g);
+
+      const leagues = a.state.leagues.map(l => {
+        const migrated = l.trackMisses === undefined ? { ...l, trackMisses: settings.trackMisses } : l;
+        const games = migrated.games.map(g => {
+          if (isLineupGuarded(g.id)) {
+            const local = currentGames.get(g.id);
+            if (local) return { ...g, homeOnCourt: local.homeOnCourt, awayOnCourt: local.awayOnCourt };
+          }
+          return g;
+        });
+        return { ...migrated, games };
+      });
       return { leagues, settings };
     }
 
@@ -557,6 +580,11 @@ export function StoreProvider({ children }: { children: React.ReactNode }) {
     const next = reducer(stateRef.current, action);
     stateRef.current = next;
     baseDispatch(action);
+
+    // Protect freshly-written lineups from a lagging realtime echo.
+    if (action.t === 'SET_LINEUPS' || action.t === 'SET_LINEUP' || action.t === 'REC_SETUP_GAME') {
+      guardLineup(action.gameId);
+    }
 
     // Final-score nudge for favorited teams (local notification, opt-in).
     if (action.t === 'SET_GAME_STATUS' && action.status === 'final' && prefsRef.current.notifsEnabled) {

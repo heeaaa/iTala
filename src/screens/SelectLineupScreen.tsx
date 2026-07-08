@@ -40,11 +40,21 @@ export default function SelectLineupScreen({ route, navigation }: ScreenProps<'S
     setAway(awayTeam.teamOnly ? [] : awayTeam.playerIds.slice(0, LINEUP_SIZE));
   }, [homeTeam, awayTeam]);
 
+  // Only reveal the "setting up" placeholder text after a short beat — a
+  // fast-resolving screen (the common case) then shows nothing rather than a
+  // one-frame flash of placeholder text before the real content.
+  const [showPlaceholder, setShowPlaceholder] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setShowPlaceholder(true), 250);
+    return () => clearTimeout(t);
+  }, []);
+
   if (!league || !game) {
     return (
       <Screen>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: space(6) }}>
-          {waited
+          {!showPlaceholder ? null
+            : waited
             ? <Txt k="body" color={colors.muted}>Game not found.</Txt>
             : <Txt k="body" color={colors.muted}>Setting up the game…</Txt>}
         </View>
@@ -58,7 +68,8 @@ export default function SelectLineupScreen({ route, navigation }: ScreenProps<'S
     return (
       <Screen>
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', padding: space(6) }}>
-          {waited
+          {!showPlaceholder ? null
+            : waited
             ? <Txt k="body" color={colors.muted}>Teams not found for this game.</Txt>
             : <Txt k="body" color={colors.muted}>Setting up the game…</Txt>}
         </View>

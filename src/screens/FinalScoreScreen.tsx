@@ -89,7 +89,6 @@ export default function FinalScoreScreen({ route, navigation }: ScreenProps<'Fin
 
       <View style={{ paddingHorizontal: space(4), paddingBottom: space(6), gap: 10 }}>
         <Button title="View box score" onPress={() => navigation.replace('BoxScore', { leagueId, gameId })} />
-        <Button title="Done" kind="ghost" onPress={() => navigation.popToTop()} />
       </View>
     </Screen>
   );

@@ -328,6 +328,17 @@ export default function LiveGameScreen({ route, navigation }: ScreenProps<'LiveG
         </View>
       )}
       <View style={{ flex: 1, paddingHorizontal: space(3), paddingTop: space(1) }}>
+        {/* Top row: Exit sits here, away from the stat controls, so it's never
+            confused with a logging action. Scorekeepers only. */}
+        {!readOnly && (
+          <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: space(1) }}>
+            <Pressable onPress={confirmExit}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 5, paddingVertical: 6, paddingHorizontal: 14, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.red, backgroundColor: 'rgba(255,90,90,0.12)' }}>
+              <Txt k="body" color={colors.red} style={{ fontSize: 13 }}>✕  Exit</Txt>
+            </Pressable>
+          </View>
+        )}
+
         {/* Compact scoreboard */}
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
           <SideScore
@@ -362,7 +373,6 @@ export default function LiveGameScreen({ route, navigation }: ScreenProps<'LiveG
 
         {/* Controls row */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: space(2), gap: 6 }}>
-          {!readOnly && <MiniBtn label="✕" onPress={confirmExit} />}
           {!readOnly && <MiniBtn label="⇄ Court" onPress={() => setSwapped(s => !s)} />}
           <MiniBtn label={readOnly ? "📋 Play-by-play" : "📋 Log"} onPress={() => setLogOpen(true)} />
           {!readOnly && <MiniBtn label="⏱ Timeout" onPress={() => setTimeoutOpen(true)} />}
