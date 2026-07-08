@@ -87,10 +87,12 @@ export default function LiveGameScreen({ route, navigation }: ScreenProps<'LiveG
   useEffect(() => {
     if (!guardEnabled) return;
     const unsub = navigation.addListener('beforeRemove', (e: any) => {
-      // Only intercept a genuine back/swipe-dismiss (GO_BACK). Programmatic
-      // navigations we trigger ourselves (finishing → FinalScore) use REPLACE
-      // and must pass straight through — otherwise the guard ate the finish.
-      if (e.data.action.type !== 'GO_BACK') return;
+      // Only intercept back-type actions. IMPORTANT: on native-stack the
+      // header back button and the swipe gesture dispatch 'POP', while
+      // programmatic goBack() dispatches 'GO_BACK' — guard both. Programmatic
+      // navigations we trigger ourselves (finish → REPLACE) pass through.
+      const t = e.data.action.type;
+      if (t !== 'GO_BACK' && t !== 'POP' && t !== 'POP_TO_TOP') return;
       // If we've already decided to leave (user confirmed), let it through.
       if (leavingRef.current) return;
       // Only guard while the game is still live.

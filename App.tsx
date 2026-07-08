@@ -106,6 +106,8 @@ export default function App() {
                 <Stack.Screen name="SelectLineup" component={SelectLineupScreen} options={brandHeader} />
                 <Stack.Screen name="LiveGame" component={LiveGameScreen} options={{ ...brandHeader, headerBackVisible: false }} />
                 <Stack.Screen name="BoxScore" component={BoxScoreScreen} options={{ title: 'Box Score' }} />
+                <Stack.Screen name="FinalScore" component={FinalScoreScreen} options={{ ...brandHeader, headerBackVisible: false, gestureEnabled: false }} />
+                <Stack.Screen name="SeasonRecap" component={SeasonRecapScreen} options={brandHeader} />
                 <Stack.Screen name="PlayerProfile" component={PlayerProfileScreen} options={brandHeader} />
               </Stack.Navigator>
             </NavigationContainer>
