@@ -176,8 +176,8 @@ export function Button({ title, onPress, kind = 'primary', style, disabled }:
         <LinearGradient
           colors={brandGradient}
           start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}
-          style={{ paddingVertical: 14, paddingHorizontal: 18, borderRadius: radius.md, alignItems: 'center' }}>
-          <Text style={{ fontFamily: font.bodyBold, fontSize: 15, color: colors.bg, letterSpacing: 0.3 }}>{title}</Text>
+          style={{ paddingVertical: 14, paddingHorizontal: 18, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center', width: '100%' }}>
+          <Text style={{ fontFamily: font.bodyBold, fontSize: 15, color: colors.bg, letterSpacing: 0.3, textAlign: 'center' }}>{title}</Text>
         </LinearGradient>
       </Pressable>
     );
@@ -188,10 +188,10 @@ export function Button({ title, onPress, kind = 'primary', style, disabled }:
     <Pressable onPress={onPress} disabled={disabled}
       style={({ pressed }) => [{
         backgroundColor: 'transparent', borderColor: border, borderWidth: 1,
-        paddingVertical: 14, paddingHorizontal: 18, borderRadius: radius.md, alignItems: 'center',
+        paddingVertical: 14, paddingHorizontal: 18, borderRadius: radius.md, alignItems: 'center', justifyContent: 'center',
         opacity: disabled ? 0.4 : pressed ? 0.85 : 1,
       }, style]}>
-      <Text style={{ fontFamily: font.bodyBold, fontSize: 15, color: fg }}>{title}</Text>
+      <Text style={{ fontFamily: font.bodyBold, fontSize: 15, color: fg, textAlign: 'center' }}>{title}</Text>
     </Pressable>
   );
 }

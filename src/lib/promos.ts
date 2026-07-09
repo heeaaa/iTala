@@ -6,13 +6,13 @@ import { Promo } from '../types';
 
 interface PromoRow {
   id: string; sponsor_name: string | null; title: string; tagline: string | null;
-  image: string | null; link: string | null; active: boolean; taps: number; created_at: number;
+  image: string | null; link: string | null; active: boolean; show_on_home: boolean; taps: number; created_at: number;
 }
 
 const fromRow = (r: PromoRow): Promo => ({
   id: r.id, sponsorName: r.sponsor_name ?? undefined, title: r.title,
   tagline: r.tagline ?? undefined, image: r.image ?? undefined, link: r.link ?? undefined,
-  active: r.active, taps: r.taps, createdAt: r.created_at,
+  active: r.active, showOnHome: r.show_on_home, taps: r.taps, createdAt: r.created_at,
 });
 
 export async function fetchPromos(): Promise<Promo[]> {
@@ -30,7 +30,7 @@ export async function upsertPromo(p: Promo): Promise<boolean> {
   const { error } = await sb.from('promos').upsert({
     id: p.id, sponsor_name: p.sponsorName ?? null, title: p.title,
     tagline: p.tagline ?? null, image: p.image ?? null, link: p.link ?? null,
-    active: p.active, taps: p.taps, created_at: p.createdAt,
+    active: p.active, show_on_home: p.showOnHome ?? false, taps: p.taps, created_at: p.createdAt,
   });
   return !error;
 }

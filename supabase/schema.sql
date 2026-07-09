@@ -693,9 +693,11 @@ create table if not exists public.promos (
   image        text,            -- data URI (compressed) or null
   link         text,            -- optional tap-through URL
   active       boolean not null default true,
+  show_on_home boolean not null default false,
   taps         integer not null default 0,
   created_at   bigint not null
 );
+alter table public.promos add column if not exists show_on_home boolean not null default false;
 alter table public.promos enable row level security;
 
 drop policy if exists "promos_read_all"   on public.promos;

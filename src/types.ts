@@ -117,6 +117,7 @@ export interface Promo {
   image?: string;   // compressed data URI
   link?: string;    // optional tap-through URL
   active: boolean;
+  showOnHome?: boolean; // opt-in: also show the large spotlight card on Home (default off)
   taps: number;
   createdAt: number;
 }

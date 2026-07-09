@@ -82,9 +82,16 @@ export default function ManagePromosScreen({ navigation }: ScreenProps<'ManagePr
 
           <Toggle
             label="Active"
-            description="Active promos appear on Home (rotating), the final-score screen, and the spectator view."
+            description="Active promos appear on the final-score screen and the spectator live view (compact strip)."
             value={editing.active}
             onChange={(v) => setEditing({ ...editing, active: v })}
+          />
+
+          <Toggle
+            label="Show on Home screen"
+            description="⚠️ This shows a LARGE spotlight card at the top of everyone's Home screen. Use sparingly — it's prominent. Off by default; the promo still appears as a small strip on the final-score and spectator screens when Active."
+            value={editing.showOnHome ?? false}
+            onChange={(v) => setEditing({ ...editing, showOnHome: v })}
           />
 
           <Button title={busy ? 'Saving…' : 'Save promo'} onPress={() => { void save(); }} />
@@ -100,7 +107,7 @@ export default function ManagePromosScreen({ navigation }: ScreenProps<'ManagePr
       <View style={{ padding: space(4), gap: space(3) }}>
         <Txt k="h1">Sponsor promos</Txt>
         <Txt k="body" color={colors.muted} style={{ fontSize: 13 }}>
-          Promos appear across iTala with a "SPONSORED" label. Active ones rotate on Home and show on the final-score and spectator screens.
+          Promos appear across iTala with a "SPONSORED" label. Active ones show as a small strip on the final-score and spectator screens. Turn on "Show on Home" per promo to also feature it as a large card on Home.
         </Txt>
 
         <Button title="+ New promo" onPress={() => setEditing(blank())} />
@@ -118,6 +125,7 @@ export default function ManagePromosScreen({ navigation }: ScreenProps<'ManagePr
                   <Txt k="body" color={colors.muted} style={{ fontSize: 11 }}>{p.active ? 'Active' : 'Off'}</Txt>
                 </View>
                 {p.sponsorName ? <Txt k="body" color={colors.muted} style={{ fontSize: 12 }}>{p.sponsorName}</Txt> : null}
+                {p.showOnHome ? <Txt k="body" color={colors.brandTeal} style={{ fontSize: 11, marginTop: 2 }}>★ Featured on Home</Txt> : null}
                 <Txt k="body" color={colors.muted} style={{ fontSize: 12, marginTop: 2 }}>👆 {p.taps} tap{p.taps === 1 ? '' : 's'}</Txt>
                 <View style={{ flexDirection: 'row', gap: 16, marginTop: 8 }}>
                   <Pressable onPress={() => setEditing(p)}><Txt k="body" color={colors.brandTeal}>Edit</Txt></Pressable>

@@ -258,13 +258,14 @@ Share this with the organizer. It can create exactly one league, then expires.`)
           const recs = visibleLeagues.filter(l =>
             l.kind === 'recreational' && l.games.length > 0
           );
-          const showPromo = activePromos.length > 0;
+          const homePromos = activePromos.filter(p => p.showOnHome);
+          const showPromo = homePromos.length > 0;
           if (recs.length === 0 && !showPromo) return null;
           return (
             <>
               {showPromo && (
                 <View style={{ marginBottom: space(3) }}>
-                  <PromoCard promos={activePromos} onPress={onPromoTap} />
+                  <PromoCard promos={homePromos} onPress={onPromoTap} />
                 </View>
               )}
               {recs.length > 0 && (

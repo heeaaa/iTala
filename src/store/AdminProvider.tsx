@@ -122,6 +122,7 @@ interface AdminCtx {
   /** Can restructure this league (settings, teams, members, delete). */
   isOwner: (league: { id: string; kind?: string; isShared?: boolean }) => boolean;
   /** Redeems any invite code (create-league / co-owner / scorekeeper). */
+  reloadMemberships: () => Promise<void>;
   redeemCode: (code: string) => Promise<
     | { type: 'create' }
     | { type: 'joined'; leagueId: string; role: 'owner' | 'scorekeeper'; leagueName: string }
@@ -168,6 +169,14 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
       for (const m of res.data as { league_id: string; role: 'owner' | 'scorekeeper' }[]) map[m.league_id] = m.role;
       setMemberships(map);
     }
+  };
+
+  // Public, no-arg refresh — call after creating a league so the creator's new
+  // owner membership (inserted server-side by create_league) is reflected
+  // locally right away, instead of only after an app reload.
+  const reloadMemberships = async () => {
+    const sb = getSupabase();
+    if (sb) await refreshMemberships(sb);
   };
 
   // Boot: restore any persisted session (Google or anonymous). If none exists,
@@ -524,7 +533,7 @@ export function AdminProvider({ children }: { children: React.ReactNode }) {
   return (
     <Ctx.Provider value={{
       role, isAdmin: role === 'admin', user, userId, authBusy, lastError,
-      memberships, canScore, isOwner, redeemCode, createCreationCode,
+      memberships, canScore, isOwner, reloadMemberships, redeemCode, createCreationCode,
       getLeagueCodes, regenerateLeagueCode, listMembers, removeMember,
       signInWithGoogle, appleAvailable, signInWithApple, deleteAccount, signOut, unlock, lock,
     }}>
