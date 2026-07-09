@@ -169,7 +169,7 @@ export async function pushAction(sb: SupabaseClient, action: Action, state: AppS
 
       case 'ADD_TEAM': {
         const l = state.leagues.find(x => x.id === action.leagueId);
-        const t = l?.teams[l.teams.length - 1]; // just-added team is last
+        const t = action.id ? l?.teams.find(x => x.id === action.id) : l?.teams[l.teams.length - 1];
         if (!l || !t) return;
         check('UPSERT_teams', await sb.from('teams').upsert({
           id: t.id, league_id: l.id, name: t.name, color: t.color,
@@ -193,7 +193,7 @@ export async function pushAction(sb: SupabaseClient, action: Action, state: AppS
 
       case 'ADD_PLAYER': {
         const l = state.leagues.find(x => x.id === action.leagueId);
-        const p = l?.players[l.players.length - 1]; // just-added player is last
+        const p = action.id ? l?.players.find(x => x.id === action.id) : l?.players[l.players.length - 1];
         if (!l || !p) return;
         // ONE transaction server-side (player insert + team player_ids update).
         // Two separate writes let a realtime re-pull land in between, briefly

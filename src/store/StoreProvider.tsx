@@ -26,10 +26,10 @@ export type Action =
   | { t: 'HYDRATE'; state: AppState }
   | { t: 'ADD_LEAGUE'; id: string; name: string; season: string; foulOutLimit?: number; kind?: 'league' | 'recreational'; trackMisses?: boolean; trackTurnovers?: boolean; isShared?: boolean; creationCode?: string }
   | { t: 'DELETE_LEAGUE'; leagueId: string }
-  | { t: 'ADD_TEAM'; leagueId: string; name: string; teamOnly?: boolean }
+  | { t: 'ADD_TEAM'; leagueId: string; name: string; teamOnly?: boolean; id?: string }
   | { t: 'UPDATE_TEAM'; leagueId: string; teamId: string; name?: string; color?: string; logo?: string | null; coach?: string | null }
   | { t: 'DELETE_TEAM'; leagueId: string; teamId: string }
-  | { t: 'ADD_PLAYER'; leagueId: string; teamId: string; name: string; number?: string }
+  | { t: 'ADD_PLAYER'; leagueId: string; teamId: string; name: string; number?: string; id?: string }
   | { t: 'UPDATE_PLAYER'; leagueId: string; playerId: string; name?: string; number?: string | null }
   | { t: 'DELETE_PLAYER'; leagueId: string; teamId: string; playerId: string }
   | { t: 'CREATE_GAME'; id: string; leagueId: string; homeTeamId: string; awayTeamId: string; location?: string; homeOnCourt?: string[]; awayOnCourt?: string[] }
@@ -101,7 +101,7 @@ function reducer(state: AppState, a: Action): AppState {
     case 'ADD_TEAM':
       return mapLeague(state, a.leagueId, l => {
         const team: Team = {
-          id: uid(), name: a.name.trim() || `Team ${l.teams.length + 1}`,
+          id: a.id ?? uid(), name: a.name.trim() || `Team ${l.teams.length + 1}`,
           color: teamColors[l.teams.length % teamColors.length],
           playerIds: [], teamOnly: a.teamOnly,
         };
@@ -133,7 +133,7 @@ function reducer(state: AppState, a: Action): AppState {
 
     case 'ADD_PLAYER':
       return mapLeague(state, a.leagueId, l => {
-        const player: Player = { id: uid(), name: a.name.trim() || 'Player', number: a.number };
+        const player: Player = { id: a.id ?? uid(), name: a.name.trim() || 'Player', number: a.number };
         return {
           ...l,
           players: [...l.players, player],

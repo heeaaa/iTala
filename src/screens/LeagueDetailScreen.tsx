@@ -476,6 +476,14 @@ export default function LeagueDetailScreen({ route, navigation }: ScreenProps<'L
 
         {!showSettings && activeTab === 'Roster' && (
           <>
+            {owner && !isRec && league.teams.length === 0 && (
+              <Button
+                title="📋 Bulk import roster (paste teams & players)"
+                kind="ghost"
+                style={{ marginBottom: space(3) }}
+                onPress={() => navigation.navigate('BulkImport', { leagueId })}
+              />
+            )}
             <TextInput
               value={rosterQuery} onChangeText={setRosterQuery}
               placeholder="Search team or player name" placeholderTextColor={colors.muted}

@@ -21,6 +21,7 @@ export type RootStackParams = {
     | { leagueId: string; kind: 'season' }
     | { leagueId: string; kind: 'averages'; playerId: string };
   ManagePromos: undefined;
+  BulkImport: { leagueId: string };
   PlayerProfile: { leagueId: string; playerId: string };
 };
 

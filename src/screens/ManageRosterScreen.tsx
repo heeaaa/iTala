@@ -45,6 +45,14 @@ export default function ManageRosterScreen({ route, navigation }: ScreenProps<'M
         <Txt k="body" color={colors.muted} style={{ marginBottom: space(5) }}>{league.season}</Txt>
 
         {scorer && (<>
+        {owner && league.kind !== 'recreational' && league.teams.length === 0 && (
+          <Button
+            title="📋 Bulk import roster (paste teams & players)"
+            kind="ghost"
+            style={{ marginBottom: space(4) }}
+            onPress={() => navigation.navigate('BulkImport', { leagueId })}
+          />
+        )}
         <Txt k="label" style={{ marginBottom: 8 }}>Add a team</Txt>
         <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
           <TextInput
