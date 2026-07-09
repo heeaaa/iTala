@@ -472,6 +472,35 @@ end $$;
 -- the shared community space with p_shared = true).
 drop function if exists public.create_league(text,text,text,text,int,boolean,bigint,text,boolean);
 drop function if exists public.create_league(text,text,text,text,int,boolean,bigint,text,boolean,boolean);
+-- Bulk roster import: inserts every team and its players in ONE round trip /
+-- ONE server-side transaction. This is deliberate — dispatching one action per
+-- team and per player (as manual entry does) fires that many independent,
+-- unawaited network writes; with dozens of players the player inserts can
+-- reach the server before their own team's insert lands, hit the team_id FK,
+-- and fail silently. A single atomic call makes that race impossible: the
+-- team rows exist before any player row is written, in the same transaction.
+create or replace function public.bulk_import_roster(p_league_id text, p_teams jsonb)
+returns void language plpgsql security definer set search_path = public as $$
+declare team jsonb; ply jsonb;
+begin
+  if not public.can_score(p_league_id) then raise exception 'Scorekeeper access required.'; end if;
+  for team in select * from jsonb_array_elements(p_teams) loop
+    insert into public.teams (id, league_id, name, color, player_ids)
+    values (
+      team->>'id', p_league_id, team->>'name', team->>'color',
+      coalesce((select array_agg(p->>'id') from jsonb_array_elements(team->'players') p), '{}')
+    )
+    on conflict (id) do update set name = excluded.name, color = excluded.color, player_ids = excluded.player_ids;
+
+    for ply in select * from jsonb_array_elements(team->'players') loop
+      insert into public.players (id, league_id, name, number)
+      values (ply->>'id', p_league_id, ply->>'name', nullif(ply->>'number', ''))
+      on conflict (id) do update set name = excluded.name, number = excluded.number;
+    end loop;
+  end loop;
+end $$;
+grant execute on function public.bulk_import_roster(text,jsonb) to authenticated;
+
 create or replace function public.create_league(
   p_id text, p_name text, p_season text, p_kind text,
   p_foul_out int, p_track_misses boolean, p_created_at bigint,

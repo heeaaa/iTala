@@ -49,15 +49,22 @@ export default function BulkImportScreen({ route, navigation }: ScreenProps<'Bul
     Alert.alert('Create roster?', `Create ${n} team${n === 1 ? '' : 's'} and ${m} player${m === 1 ? '' : 's'} in ${league.name}?`, [
       { text: 'Cancel', style: 'cancel' },
       { text: `Create`, onPress: () => {
-        // Pre-generate ids so player dispatches can reference their team
-        // deterministically (sync prefers explicit ids over positions).
-        for (const t of clean) {
-          const teamId = uid();
-          dispatch({ t: 'ADD_TEAM', leagueId, id: teamId, name: t.name.trim() });
-          for (const p of t.players) {
-            dispatch({ t: 'ADD_PLAYER', leagueId, teamId, id: uid(), name: p.name.trim(), number: p.number.trim() || undefined });
-          }
-        }
+        // One atomic dispatch — team+player ids are pre-generated here so the
+        // reducer and the server insert reference the exact same rows. This
+        // is deliberately NOT a loop of per-team/per-player dispatches: that
+        // fires one independent network write per action with no ordering
+        // guarantee, and a player's write can reach the server before its
+        // own team's write lands, silently dropping players. See
+        // bulk_import_roster in schema.sql.
+        dispatch({
+          t: 'BULK_IMPORT_ROSTER',
+          leagueId,
+          teams: clean.map(t => ({
+            id: uid(),
+            name: t.name.trim(),
+            players: t.players.map(p => ({ id: uid(), name: p.name.trim(), number: p.number.trim() || undefined })),
+          })),
+        });
         navigation.goBack();
       } },
     ]);

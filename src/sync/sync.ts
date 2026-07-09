@@ -240,6 +240,24 @@ export async function pushAction(sb: SupabaseClient, action: Action, state: AppS
         check('DELETE_games', await sb.from('games').delete().eq('id', action.gameId));
         break;
 
+      case 'BULK_IMPORT_ROSTER': {
+        // One round trip, one server-side transaction — see bulk_import_roster
+        // in schema.sql for why this must be atomic rather than one action per
+        // team/player (that ordering-free burst is what caused the FK race).
+        const l = state.leagues.find(x => x.id === action.leagueId);
+        if (!l) break;
+        const justAdded = new Set(action.teams.map(t => t.id));
+        const payload = l.teams.filter(t => justAdded.has(t.id)).map(t => ({
+          id: t.id, name: t.name, color: t.color,
+          players: t.playerIds.map(pid => {
+            const p = l.players.find(x => x.id === pid);
+            return { id: pid, name: p?.name ?? '', number: p?.number ?? '' };
+          }),
+        }));
+        check('BULK_IMPORT_ROSTER', await sb.rpc('bulk_import_roster', { p_league_id: l.id, p_teams: payload }));
+        break;
+      }
+
       case 'CLEANUP_REC_GAMES': {
         // Delete the games first (events cascade via FK). Then remove teams and
         // players that the reducer pruned (i.e. no longer present locally),

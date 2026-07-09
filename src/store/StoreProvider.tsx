@@ -27,6 +27,7 @@ export type Action =
   | { t: 'ADD_LEAGUE'; id: string; name: string; season: string; foulOutLimit?: number; kind?: 'league' | 'recreational'; trackMisses?: boolean; trackTurnovers?: boolean; isShared?: boolean; creationCode?: string }
   | { t: 'DELETE_LEAGUE'; leagueId: string }
   | { t: 'ADD_TEAM'; leagueId: string; name: string; teamOnly?: boolean; id?: string }
+  | { t: 'BULK_IMPORT_ROSTER'; leagueId: string; teams: { id: string; name: string; players: { id: string; name: string; number?: string }[] }[] }
   | { t: 'UPDATE_TEAM'; leagueId: string; teamId: string; name?: string; color?: string; logo?: string | null; coach?: string | null }
   | { t: 'DELETE_TEAM'; leagueId: string; teamId: string }
   | { t: 'ADD_PLAYER'; leagueId: string; teamId: string; name: string; number?: string; id?: string }
@@ -301,6 +302,16 @@ function reducer(state: AppState, a: Action): AppState {
           teams,
           players,
         };
+      });
+
+    case 'BULK_IMPORT_ROSTER':
+      return mapLeague(state, a.leagueId, l => {
+        const newTeams: Team[] = a.teams.map((t, i) => ({
+          id: t.id, name: t.name, color: teamColors[(l.teams.length + i) % teamColors.length],
+          playerIds: t.players.map(p => p.id),
+        }));
+        const newPlayers: Player[] = a.teams.flatMap(t => t.players.map(p => ({ id: p.id, name: p.name, number: p.number })));
+        return { ...l, teams: [...l.teams, ...newTeams], players: [...l.players, ...newPlayers] };
       });
 
     case 'SET_ATTENDANCE':
