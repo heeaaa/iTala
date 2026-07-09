@@ -70,11 +70,11 @@ export default function BulkImportScreen({ route, navigation }: ScreenProps<'Bul
         <ScrollView contentContainerStyle={{ padding: space(4), paddingBottom: space(10) }} keyboardShouldPersistTaps="handled">
           <Txt k="h1">Bulk import roster</Txt>
           <Txt k="body" color={colors.muted} style={{ marginTop: 4, marginBottom: space(3), fontSize: 13 }}>
-            Paste your teams and players — each team name on its own line, players below it. Numbers can be written any way: "Ondiz-17", "Roquero 22", "#24", "Manuel#14". Nicknames in (parens) are dropped automatically.
+            Paste your teams and players — each team name on its own line, players below it. Numbers can be written any way: "Juan-17", "Juan 22", "#24", "Juan#14". Nicknames inside ( ) are dropped.
           </Txt>
           <TextInput
             value={text} onChangeText={setText} multiline
-            placeholder={"Joyboys North\n\n1. Manly Ondiz-17\n2. Jay R Valdez- 19\n…"}
+            placeholder={"Team A\n\n1. Player One - 17\n2. Juan Dela Cruz #19\n…"}
             placeholderTextColor={colors.muted}
             textAlignVertical="top"
             style={{ minHeight: 280, backgroundColor: colors.surface, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, color: colors.text, padding: 14, fontFamily: font.body, fontSize: 14, lineHeight: 20 }}

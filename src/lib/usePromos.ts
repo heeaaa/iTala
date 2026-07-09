@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Linking } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { Promo } from '../types';
 import { fetchPromos, bumpPromoTap } from './promos';
 
@@ -15,6 +16,11 @@ export function usePromos() {
   }, []);
 
   useEffect(() => { void reload(); }, [reload]);
+
+  // Screens stay mounted while you navigate deeper (e.g. Home → Manage Promos
+  // → back), so a mount-only fetch goes stale the moment promos are edited.
+  // Re-pull on every focus so toggling "Show on Home" reflects immediately.
+  useFocusEffect(useCallback(() => { void reload(); }, [reload]));
 
   return { promos, activePromos: promos.filter(p => p.active), loaded, reload };
 }

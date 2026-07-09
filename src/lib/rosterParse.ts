@@ -4,13 +4,13 @@
 // unparseable content is kept verbatim as a name so the user can fix it.
 //
 // Supported player formats (all seen in real pastes):
-//   "Manly Ondiz-17"                name-dash-number
-//   "Albert Roquero 22"             name-space-number
-//   "1:Jarold James Baldia #24"     index-colon-name-hash-number
-//   "Ghelo Manuel#14"               hash with no space
-//   "Jesse Pooni # 2"               hash with space
-//   "Arnold Mercado (Arnold) #16"   nickname in parens (dropped)
-//   "11. Taj Dayrit#3 - Taj"        trailing nickname after number (dropped)
+//   "Juan Dela Cruz-17"                name-dash-number
+//   "Juan Dela Cruz 22"                name-space-number
+//   "1:Juan Dela Cruz #24"             index-colon-name-hash-number
+//   "Juan Dela Cruz#14"                hash with no space
+//   "Juan Dela Cruz # 2"               hash with space
+//   "Juan Dela Cruz (Juan) #16"        nickname (dropped)
+//   "11. Juan Dela Cruz#3 - Juan"      trailing nickname after number (dropped)
 // Rules: leading index (1. / 2: / 3) / "10 ") stripped when a real number
 // exists elsewhere; jersey numbers kept as written incl. leading zeros;
 // missing number is fine (NOT flagged); unusual numbers are fine (NOT
@@ -36,17 +36,17 @@ function parsePlayerLine(line: string): { name: string; number: string } {
   let number = '';
   let nameSpan = s;
 
-  const hash = s.match(/#\s*(\d+)/);            // "#24", "# 2", "Manuel#14"
+  const hash = s.match(/#\s*(\d+)/);            // "#24", "# 2", "Juan#14"
   if (hash && hash.index !== undefined) {
     number = hash[1];
     nameSpan = s.slice(0, hash.index);          // drop everything from # on
   } else {
-    const dash = s.match(/[-–]\s*(\d+)\s*$/);   // "Ondiz-17", "Valdez- 19"
+    const dash = s.match(/[-–]\s*(\d+)\s*$/);   // "Juan-17", "Juan- 19"
     if (dash && dash.index !== undefined) {
       number = dash[1];
       nameSpan = s.slice(0, dash.index);
     } else {
-      const tail = s.match(/\s(\d+)\s*$/);      // "Roquero 22"
+      const tail = s.match(/\s(\d+)\s*$/);      // "Juan 22"
       if (tail && tail.index !== undefined) {
         number = tail[1];
         nameSpan = s.slice(0, tail.index);
@@ -58,7 +58,7 @@ function parsePlayerLine(line: string): { name: string; number: string } {
   //    Only when it looks like an index (short digits + separator), so a
   //    number-less line that's just a name is untouched.
   nameSpan = nameSpan.replace(/^\s*\d{1,3}\s*[.:)\]]\s*/, '');
-  // bare "10 jeffrey ..." (digits + space, no separator) — only strip when a
+  // bare "10 Juan ..." (digits + space, no separator) — only strip when a
   // real jersey number was found elsewhere, otherwise it could BE the number.
   if (number) nameSpan = nameSpan.replace(/^\s*\d{1,3}\s+/, '');
 

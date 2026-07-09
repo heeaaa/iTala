@@ -20,8 +20,8 @@ const HIDDEN_LOCK_TAPS = 10;
 export default function LeaguesScreen({ navigation }: ScreenProps<'Leagues'>) {
   const { state, ready, prefs, toggleFavLeague, dispatch, refresh, synced, syncState, dismissOnboarding } = useStore();
   const [refreshing, setRefreshing] = useState(false);
-  const { activePromos } = usePromos();
-  const onRefresh = async () => { setRefreshing(true); try { await refresh(); } finally { setRefreshing(false); } };
+  const { activePromos, reload: reloadPromos } = usePromos();
+  const onRefresh = async () => { setRefreshing(true); try { await Promise.all([refresh(), reloadPromos()]); } finally { setRefreshing(false); } };
   const { role, isAdmin, user, unlock, lock, signOut, signInWithGoogle, appleAvailable, signInWithApple, authBusy, lastError, canScore, isOwner, redeemCode, createCreationCode } = useAdmin();
   const [askPw, setAskPw] = useState(false);
   const [submitting, setSubmitting] = useState(false);
