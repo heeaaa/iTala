@@ -390,6 +390,7 @@ Share this with the organizer. It can create exactly one league, then expires.`)
         message="One code does it all — create a league, or join one as a co-owner or scorekeeper."
         error={codeError}
         busy={codeBusy}
+        showRequestLink
         onSubmit={(c) => { void submitCode(c); }}
         onCancel={() => setCodeOpen(false)}
       />

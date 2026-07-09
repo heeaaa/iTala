@@ -1,7 +1,7 @@
 import React, { useRef, useState } from 'react';
 import {
   View, Text, TextStyle, ViewStyle, Pressable, TextInput, ScrollView,
-  StyleSheet, ScrollViewProps, Image, Animated, Modal, TouchableOpacity,
+  StyleSheet, ScrollViewProps, Image, Animated, Modal, TouchableOpacity, Linking,
   KeyboardAvoidingView, Platform,
 } from 'react-native';
 import { Swipeable, RectButton } from 'react-native-gesture-handler';
@@ -430,8 +430,17 @@ export function SignInModal({ visible, title = 'Sign in required', message, erro
 
 // One field for every invite code — league creation, co-owner, scorekeeper.
 // The server decides what the code grants, so the UI never asks "which kind?".
-export function InviteCodeModal({ visible, title = 'Enter invite code', message, error, busy, onSubmit, onCancel }:
-  { visible: boolean; title?: string; message?: string; error?: string | null; busy?: boolean; onSubmit: (code: string) => void; onCancel: () => void }) {
+// Opens the BPBL Instagram profile so users can DM us for a creation code.
+// Tries the Instagram app first; falls back to the browser.
+const INSTAGRAM_USERNAME = 'bpbl.itala';
+function openInstagramForCode() {
+  const appUrl = `instagram://user?username=${INSTAGRAM_USERNAME}`;
+  const webUrl = `https://www.instagram.com/${INSTAGRAM_USERNAME}/`;
+  Linking.openURL(appUrl).catch(() => Linking.openURL(webUrl).catch(() => {}));
+}
+
+export function InviteCodeModal({ visible, title = 'Enter invite code', message, error, busy, onSubmit, onCancel, showRequestLink }:
+  { visible: boolean; title?: string; message?: string; error?: string | null; busy?: boolean; onSubmit: (code: string) => void; onCancel: () => void; showRequestLink?: boolean }) {
   const [code, setCode] = useState('');
   React.useEffect(() => { if (visible) setCode(''); }, [visible]);
   if (!visible) return null;
@@ -456,6 +465,19 @@ export function InviteCodeModal({ visible, title = 'Enter invite code', message,
             style={{ marginTop: 10, paddingVertical: 14, borderRadius: radius.md, borderWidth: 1, borderColor: colors.line, alignItems: 'center' }}>
             <Text style={{ fontFamily: font.bodyBold, fontSize: 15, color: colors.text }}>Cancel</Text>
           </TouchableOpacity>
+          {showRequestLink ? (
+            <View style={{ marginTop: space(3), paddingTop: space(3), borderTopWidth: 1, borderTopColor: colors.line }}>
+              <TouchableOpacity activeOpacity={0.7} onPress={openInstagramForCode}>
+                <Text style={{ fontFamily: font.body, fontSize: 13, color: colors.muted, textAlign: 'center' }}>
+                  Don't have a code?{' '}
+                  <Text style={{ fontFamily: font.bodyBold, color: colors.brandTeal }}>Message us on Instagram →</Text>
+                </Text>
+              </TouchableOpacity>
+              <Text style={{ fontFamily: font.body, fontSize: 11, color: colors.muted, textAlign: 'center', marginTop: 6 }}>
+                Tell us your name and the league you want to create.
+              </Text>
+            </View>
+          ) : null}
         </View>
       </View>
     </View>
